@@ -1,204 +1,1329 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2685.6">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 16.0px 'Songti TC'; -webkit-text-stroke: #000000}
-    span.s1 {font-kerning: none; -webkit-text-stroke: 0px #000000}
-    span.s2 {font-kerning: none}
-    span.s3 {text-decoration: underline ; font-kerning: none; color: #0000e9; -webkit-text-stroke: 0px #0000e9}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>未來市政策島 - 3D 互動政策城市</title>
+  
+  <!-- Importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      --color-primary: #db6a41;
+      --color-ink: #211d1d;
+      --color-cream: #fff8f4;
+      --color-yellow: #fcea8b;
+      --color-bg-glass: rgba(255, 248, 244, 0.88);
+      --font-main: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-main); color: var(--color-ink); background: radial-gradient(circle at center, #fffdf9 0%, #edddcf 100%); }
+
+    #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+    
+    /* Loading Overlay */
+    #loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #edddcf; z-index: 9999; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; transition: opacity 0.6s ease;
+    }
+    .spinner { width: 50px; height: 50px; border: 5px solid rgba(219,106,65,0.2); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-text { margin-top: 20px; font-size: 1.2rem; font-weight: 700; color: var(--color-ink); letter-spacing: 1px; }
+    #error-box { display: none; margin-top: 15px; color: #d32f2f; background: #ffebee; padding: 12px 20px; border-radius: 8px; max-width: 80%; text-align: center; }
+
+    /* UI Layout */
+    .ui-layer { position: absolute; z-index: 10; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; display: grid; grid-template-columns: 360px 1fr 340px; grid-template-rows: auto 1fr auto; padding: 20px; gap: 15px; }
+    .interactive { pointer-events: auto; }
+
+    /* Glass Panels */
+    .glass-card {
+      background: var(--color-bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 22px;
+      box-shadow: 0 10px 30px rgba(74, 42, 20, 0.08);
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    /* Top Left Header */
+    .brand-card { padding: 18px 24px; }
+    .brand-card h1 { font-size: 1.5rem; font-weight: 900; color: var(--color-primary); display: flex; align-items: center; gap: 8px; }
+    .brand-card .subtitle { font-size: 0.8rem; font-family: var(--font-mono); font-weight: 700; letter-spacing: 2px; color: #8a7a68; margin-top: 2px; }
+
+    /* Left Drawer Info Card */
+    #info-card { grid-column: 1; grid-row: 2 / 4; display: none; flex-direction: column; max-height: calc(100vh - 140px); }
+    #info-card.active { display: flex; }
+    .card-header { padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.06); position: relative; }
+    .card-close { position: absolute; right: 16px; top: 16px; border: none; background: rgba(0,0,0,0.05); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; }
+    .card-close:hover { background: var(--color-primary); color: white; }
+    .card-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+
+    /* Metric Bricks */
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 15px 0; }
+    .metric-brick { background: #fff; padding: 12px 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(0,0,0,0.04); }
+    .metric-val { font-family: Georgia, serif; font-style: italic; font-size: 1.4rem; font-weight: bold; color: var(--color-primary); }
+    .metric-lbl { font-size: 0.75rem; color: #7a6b5d; margin-top: 4px; }
+
+    /* Right Sidebar Tabs & Items */
+    #sidebar { grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column; max-height: calc(100vh - 40px); }
+    .tab-nav { display: flex; padding: 6px; background: rgba(0,0,0,0.04); border-radius: 14px; margin: 16px; }
+    .tab-btn { flex: 1; border: none; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: transparent; transition: 0.2s; }
+    .tab-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .search-box { margin: 0 16px 12px 16px; }
+    .search-box input { width: 100%; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); background: #fff; font-family: var(--font-main); outline: none; }
+    .sidebar-content { overflow-y: auto; flex: 1; padding: 0 16px 16px 16px; }
+
+    details.theme-group { margin-bottom: 8px; border-radius: 12px; background: rgba(255,255,255,0.6); overflow: hidden; }
+    details summary { padding: 12px 16px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+    details summary::-webkit-details-marker { display: none; }
+    .item-list { padding: 4px 12px 12px 12px; }
+    .item-row { padding: 8px 12px; border-radius: 8px; font-size: 0.88rem; margin-top: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .item-row:hover { background: var(--color-yellow); }
+    .badge-num { background: var(--color-primary); color: white; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; }
+
+    /* Bottom HUD Pill Toolbar */
+    #hud-toolbar { grid-column: 2; grid-row: 3; justify-self: center; display: flex; gap: 8px; background: var(--color-bg-glass); padding: 8px 16px; border-radius: 999px; backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+    .hud-btn { border: none; background: transparent; padding: 8px 14px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; font-weight: 700; gap: 2px; min-width: 54px; transition: 0.2s; }
+    .hud-btn:hover { background: var(--color-yellow); }
+    .hud-btn.active { background: var(--color-ink); color: #fff; }
+
+    /* Top Quick Tools */
+    .top-tools { grid-column: 2; grid-row: 1; justify-self: start; display: flex; gap: 8px; }
+    .icon-btn { border: none; background: var(--color-bg-glass); width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .icon-btn:hover { background: var(--color-yellow); }
+
+    /* Live Log Box */
+    #live-log { position: absolute; top: 20px; right: 380px; width: 280px; max-height: 160px; pointer-events: auto; }
+    .log-header { padding: 10px 14px; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+    .live-dot { width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .log-body { padding: 10px 14px; font-size: 0.8rem; overflow-y: auto; max-height: 110px; }
+    .log-item { margin-bottom: 6px; line-height: 1.3; border-left: 2px solid var(--color-primary); padding-left: 6px; }
+
+    /* CSS2D Label Styling */
+    .island-label {
+      background: var(--color-bg-glass); border: 1px solid rgba(255,255,255,0.9); padding: 4px 12px; border-radius: 999px;
+      font-weight: 800; font-size: 0.82rem; color: var(--color-ink); box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      pointer-events: auto; cursor: pointer; transition: transform 0.2s, background 0.2s; white-space: nowrap;
+    }
+    .island-label:hover { transform: scale(1.1); background: var(--color-yellow); }
+    .island-label.selected { background: var(--color-ink); color: #fff; }
+
+    .item-pin {
+      background: var(--color-primary); color: #fff; border-radius: 50%; width: 22px; height: 22px;
+      display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 0.75rem;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2); pointer-events: auto; cursor: pointer; border: 2px solid #fff;
+    }
+
+    /* Guide Modal */
+    #guide-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 10000; display: flex; justify-content: center; align-items: center; }
+    .guide-content { background: #fff; padding: 30px; border-radius: 24px; max-width: 480px; width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2); text-align: center; }
+    .guide-step { margin: 16px 0; text-align: left; background: #fdfaf6; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; }
+    .guide-btn { border: none; background: var(--color-primary); color: white; padding: 12px 32px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
+
+    /* Responsive Mobile UI */
+    @media (max-width: 800px) {
+      .ui-layer { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; padding: 10px; }
+      #sidebar { grid-column: 1; grid-row: 3; max-height: 40vh; }
+      #info-card { grid-column: 1; grid-row: 3; max-height: 45vh; }
+      #hud-toolbar { grid-column: 1; grid-row: 4; flex-wrap: wrap; justify-content: center; }
+      #live-log { display: none; }
+    }
   </style>
 </head>
 <body>
-<p class="p1"><br></p>
-<p class="p2"><span class="s1">&lt;</span><span class="s2">!DOCTYPE html&gt;&lt;html lang="zh-TW"&gt;&lt;head&gt;  &lt;meta charset="UTF-8"&gt;  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"&gt;  &lt;title&gt;未來市政策島 - 3D 互動政策城市&lt;/title&gt;    &lt;!-- Importmap --&gt;  &lt;script type="importmap"&gt;  {    "imports": {      "three": "<a href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"><span class="s3">https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js</span></a>",      "three/addons/": "<a href="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"><span class="s3">https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/</span></a>"    }  }  &lt;/script&gt;</span></p>
-<p class="p2"><span class="s2">&lt;style&gt;    :root {      --color-primary: #db6a41;      --color-ink: #211d1d;      --color-cream: #fff8f4;      --color-yellow: #fcea8b;      --color-bg-glass: rgba(255, 248, 244, 0.88);      --font-main: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;    }</span></p>
-<p class="p2"><span class="s2">* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }    body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-main); color: var(--color-ink); background: radial-gradient(circle at center, #fffdf9 0%, #edddcf 100%); }</span></p>
-<p class="p2"><span class="s2">#canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }        /* Loading Overlay */    #loading-overlay {      position: fixed; top: 0; left: 0; width: 100%; height: 100%;      background: #edddcf; z-index: 9999; display: flex; flex-direction: column;      justify-content: center; align-items: center; transition: opacity 0.6s ease;    }    .spinner { width: 50px; height: 50px; border: 5px solid rgba(219,106,65,0.2); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }    @keyframes spin { to { transform: rotate(360deg); } }    #loading-text { margin-top: 20px; font-size: 1.2rem; font-weight: 700; color: var(--color-ink); letter-spacing: 1px; }    #error-box { display: none; margin-top: 15px; color: #d32f2f; background: #ffebee; padding: 12px 20px; border-radius: 8px; max-width: 80%; text-align: center; }</span></p>
-<p class="p2"><span class="s2">/* UI Layout */    .ui-layer { position: absolute; z-index: 10; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; display: grid; grid-template-columns: 360px 1fr 340px; grid-template-rows: auto 1fr auto; padding: 20px; gap: 15px; }    .interactive { pointer-events: auto; }</span></p>
-<p class="p2"><span class="s2">/* Glass Panels */    .glass-card {      background: var(--color-bg-glass);      backdrop-filter: blur(16px);      -webkit-backdrop-filter: blur(16px);      border: 1px solid rgba(255, 255, 255, 0.6);      border-radius: 22px;      box-shadow: 0 10px 30px rgba(74, 42, 20, 0.08);      overflow: hidden;      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);    }</span></p>
-<p class="p2"><span class="s2">/* Top Left Header */    .brand-card { padding: 18px 24px; }    .brand-card h1 { font-size: 1.5rem; font-weight: 900; color: var(--color-primary); display: flex; align-items: center; gap: 8px; }    .brand-card .subtitle { font-size: 0.8rem; font-family: var(--font-mono); font-weight: 700; letter-spacing: 2px; color: #8a7a68; margin-top: 2px; }</span></p>
-<p class="p2"><span class="s2">/* Left Drawer Info Card */    #info-card { grid-column: 1; grid-row: 2 / 4; display: none; flex-direction: column; max-height: calc(100vh - 140px); }    #info-card.active { display: flex; }    .card-header { padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.06); position: relative; }    .card-close { position: absolute; right: 16px; top: 16px; border: none; background: rgba(0,0,0,0.05); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; }    .card-close:hover { background: var(--color-primary); color: white; }    .card-body { padding: 20px 24px; overflow-y: auto; flex: 1; }</span></p>
-<p class="p2"><span class="s2">/* Metric Bricks */    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 15px 0; }    .metric-brick { background: #fff; padding: 12px 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(0,0,0,0.04); }    .metric-val { font-family: Georgia, serif; font-style: italic; font-size: 1.4rem; font-weight: bold; color: var(--color-primary); }    .metric-lbl { font-size: 0.75rem; color: #7a6b5d; margin-top: 4px; }</span></p>
-<p class="p2"><span class="s2">/* Right Sidebar Tabs &amp; Items */    #sidebar { grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column; max-height: calc(100vh - 40px); }    .tab-nav { display: flex; padding: 6px; background: rgba(0,0,0,0.04); border-radius: 14px; margin: 16px; }    .tab-btn { flex: 1; border: none; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: transparent; transition: 0.2s; }    .tab-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }    .search-box { margin: 0 16px 12px 16px; }    .search-box input { width: 100%; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); background: #fff; font-family: var(--font-main); outline: none; }    .sidebar-content { overflow-y: auto; flex: 1; padding: 0 16px 16px 16px; }</span></p>
-<p class="p2"><span class="s2">details.theme-group { margin-bottom: 8px; border-radius: 12px; background: rgba(255,255,255,0.6); overflow: hidden; }    details summary { padding: 12px 16px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }    details summary::-webkit-details-marker { display: none; }    .item-list { padding: 4px 12px 12px 12px; }    .item-row { padding: 8px 12px; border-radius: 8px; font-size: 0.88rem; margin-top: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }    .item-row:hover { background: var(--color-yellow); }    .badge-num { background: var(--color-primary); color: white; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; }</span></p>
-<p class="p2"><span class="s2">/* Bottom HUD Pill Toolbar */    #hud-toolbar { grid-column: 2; grid-row: 3; justify-self: center; display: flex; gap: 8px; background: var(--color-bg-glass); padding: 8px 16px; border-radius: 999px; backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }    .hud-btn { border: none; background: transparent; padding: 8px 14px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; font-weight: 700; gap: 2px; min-width: 54px; transition: 0.2s; }    .hud-btn:hover { background: var(--color-yellow); }    .hud-btn.active { background: var(--color-ink); color: #fff; }</span></p>
-<p class="p2"><span class="s2">/* Top Quick Tools */    .top-tools { grid-column: 2; grid-row: 1; justify-self: start; display: flex; gap: 8px; }    .icon-btn { border: none; background: var(--color-bg-glass); width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }    .icon-btn:hover { background: var(--color-yellow); }</span></p>
-<p class="p2"><span class="s2">/* Live Log Box */    #live-log { position: absolute; top: 20px; right: 380px; width: 280px; max-height: 160px; pointer-events: auto; }    .log-header { padding: 10px 14px; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(0,0,0,0.05); }    .live-dot { width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 1.5s infinite; }    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }    .log-body { padding: 10px 14px; font-size: 0.8rem; overflow-y: auto; max-height: 110px; }    .log-item { margin-bottom: 6px; line-height: 1.3; border-left: 2px solid var(--color-primary); padding-left: 6px; }</span></p>
-<p class="p2"><span class="s2">/* CSS2D Label Styling */    .island-label {      background: var(--color-bg-glass); border: 1px solid rgba(255,255,255,0.9); padding: 4px 12px; border-radius: 999px;      font-weight: 800; font-size: 0.82rem; color: var(--color-ink); box-shadow: 0 4px 12px rgba(0,0,0,0.12);      pointer-events: auto; cursor: pointer; transition: transform 0.2s, background 0.2s; white-space: nowrap;    }    .island-label:hover { transform: scale(1.1); background: var(--color-yellow); }    .island-label.selected { background: var(--color-ink); color: #fff; }</span></p>
-<p class="p2"><span class="s2">.item-pin {      background: var(--color-primary); color: #fff; border-radius: 50%; width: 22px; height: 22px;      display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 0.75rem;      box-shadow: 0 3px 8px rgba(0,0,0,0.2); pointer-events: auto; cursor: pointer; border: 2px solid #fff;    }</span></p>
-<p class="p2"><span class="s2">/* Guide Modal */    #guide-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 10000; display: flex; justify-content: center; align-items: center; }    .guide-content { background: #fff; padding: 30px; border-radius: 24px; max-width: 480px; width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2); text-align: center; }    .guide-step { margin: 16px 0; text-align: left; background: #fdfaf6; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; }    .guide-btn { border: none; background: var(--color-primary); color: white; padding: 12px 32px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }</span></p>
-<p class="p2"><span class="s2">/* Responsive Mobile UI */    @media (max-width: 800px) {      .ui-layer { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; padding: 10px; }      #sidebar { grid-column: 1; grid-row: 3; max-height: 40vh; }      #info-card { grid-column: 1; grid-row: 3; max-height: 45vh; }      #hud-toolbar { grid-column: 1; grid-row: 4; flex-wrap: wrap; justify-content: center; }      #live-log { display: none; }    }  &lt;/style&gt;&lt;/head&gt;&lt;body&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Loading Screen --&gt;  &lt;div id="loading-overlay"&gt;    &lt;div class="spinner"&gt;&lt;/div&gt;    &lt;div id="loading-text" data-en="Assembling Policy City..."&gt;正在組合政策城市...&lt;/div&gt;    &lt;div id="error-box"&gt;&lt;/div&gt;  &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- WebGL Container --&gt;  &lt;div id="canvas-container"&gt;&lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Interactive UI Overlay Layer --&gt;  &lt;div class="ui-layer"&gt;        &lt;!-- Top Left Title Brand Card --&gt;    &lt;div class="brand-card glass-card interactive"&gt;      &lt;h1&gt;🏛️ 示範市 &lt;span style="font-size:0.9rem; font-weight:normal; color:#666;"&gt;| 政策島&lt;/span&gt;&lt;/h1&gt;      &lt;div class="subtitle"&gt;HEART POLICY ISLAND v1.0&lt;/div&gt;    &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Top Tools --&gt;    &lt;div class="top-tools interactive"&gt;      &lt;button class="icon-btn" id="btn-reset-cam" title="全景視角"&gt;🏠&lt;/button&gt;      &lt;button class="icon-btn" id="btn-toggle-guide" title="操作說明"&gt;?&lt;/button&gt;    &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Live Event Log Window --&gt;    &lt;div id="live-log" class="glass-card interactive"&gt;      &lt;div class="log-header"&gt;&lt;div class="live-dot"&gt;&lt;/div&gt;&lt;span data-en="CITY LOG"&gt;城市動態日誌&lt;/span&gt;&lt;/div&gt;      &lt;div class="log-body" id="log-list"&gt;&lt;/div&gt;    &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Left Detail Drawer Card --&gt;    &lt;div id="info-card" class="glass-card interactive"&gt;      &lt;div class="card-header"&gt;        &lt;button class="card-close" id="btn-close-info"&gt;×&lt;/button&gt;        &lt;h2 id="card-title" style="font-size:1.2rem; font-weight:800;"&gt;主題卡片&lt;/h2&gt;        &lt;div id="card-subtitle" style="font-size:0.8rem; color:#8a7a68; margin-top:2px;"&gt;概覽說明&lt;/div&gt;      &lt;/div&gt;      &lt;div class="card-body" id="card-content"&gt;&lt;/div&gt;    &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Right Navigation Sidebar --&gt;    &lt;div id="sidebar" class="glass-card interactive"&gt;      &lt;div class="tab-nav"&gt;        &lt;button class="tab-btn active" id="tab-themes" data-en="Themes"&gt;政策主題&lt;/button&gt;        &lt;button class="tab-btn" id="tab-flows" data-en="Flows"&gt;協作網絡&lt;/button&gt;      &lt;/div&gt;      &lt;div class="search-box"&gt;        &lt;input type="text" id="search-input" placeholder="搜尋政策、關鍵字..." data-en-ph="Search policies..."&gt;      &lt;/div&gt;      &lt;div class="sidebar-content" id="sidebar-list"&gt;&lt;/div&gt;    &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Bottom HUD Controls --&gt;    &lt;div id="hud-toolbar" class="interactive"&gt;      &lt;button class="hud-btn" id="btn-time-6"&gt;🌅&lt;span&gt;06:00&lt;/span&gt;&lt;/button&gt;      &lt;button class="hud-btn active" id="btn-time-12"&gt;☀️&lt;span&gt;12:00&lt;/span&gt;&lt;/button&gt;      &lt;button class="hud-btn" id="btn-time-18"&gt;🌆&lt;span&gt;18:00&lt;/span&gt;&lt;/button&gt;      &lt;button class="hud-btn" id="btn-time-21"&gt;🌙&lt;span&gt;21:00&lt;/span&gt;&lt;/button&gt;      &lt;div style="width:1px; background:rgba(0,0,0,0.1); margin:0 4px;"&gt;&lt;/div&gt;      &lt;button class="hud-btn" id="btn-toggle-flows"&gt;🔀&lt;span data-en="Flows"&gt;協作線&lt;/span&gt;&lt;/button&gt;      &lt;button class="hud-btn" id="btn-toggle-bird"&gt;🦅&lt;span data-en="Birdview"&gt;鳥瞰&lt;/span&gt;&lt;/button&gt;    &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Guide / Onboarding Modal --&gt;  &lt;div id="guide-modal" style="display:none;"&gt;    &lt;div class="guide-content"&gt;      &lt;h2 style="color:var(--color-primary); margin-bottom:10px;"&gt;歡迎來到示範市政策島！&lt;/h2&gt;      &lt;p style="font-size:0.9rem; color:#666;"&gt;這是一座由 3D 微縮黏土模型拼成的動態政策城市，展示跨局處政策與市民協作流程。&lt;/p&gt;      &lt;div class="guide-step"&gt;&lt;b&gt;1. 旋轉與探索：&lt;/b&gt; 按住滑鼠左鍵拖曳可旋轉視角，滾輪放大縮小。&lt;/div&gt;      &lt;div class="guide-step"&gt;&lt;b&gt;2. 點擊建築：&lt;/b&gt; 點擊島上的建築或右側選單，鏡頭會飛近並顯示詳細政策事實。&lt;/div&gt;      &lt;div class="guide-step"&gt;&lt;b&gt;3. 時間與動態：&lt;/b&gt; 下方切換日夜時段，觀察動態小人與專案物資在島嶼間的傳輸。&lt;/div&gt;      &lt;button class="guide-btn" id="btn-close-guide"&gt;開始探索城市&lt;/button&gt;    &lt;/div&gt;  &lt;/div&gt;</span></p>
-<p class="p2"><span class="s2">&lt;!-- Main Logic ES Module Application --&gt;  &lt;script type="module"&gt;    import * as THREE from 'three';    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';    import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';    import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';    import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // Seeded Random Helper (mulberry32)    // ------------------------------------------------------------------    let seed = 123456789;    function random() {      let t = seed += 0x6D2B79F5;      t = Math.imul(t ^ (t &gt;&gt;&gt; 15), t | 1);      t ^= t + Math.imul(t ^ (t &gt;&gt;&gt; 7), t | 61);      return ((t ^ (t &gt;&gt;&gt; 14)) &gt;&gt;&gt; 0) / 4294967296;    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // 0. Complete Central DATA Schema (12 Islands, Items, Flows, DayCycle)    // ------------------------------------------------------------------    const DATA = {      cityName: "示範市",      islands: [        { id: "t01", q: 0, r: 0, name: "交通暢行", icon: "🚌", color: "#db6a41" },        { id: "t02", q: 1, r: -1, name: "托育育兒", icon: "👶", color: "#f2b5c6" },        { id: "t03", q: 1, r: 0, name: "智慧教育", icon: "📚", color: "#58a6a6" },        { id: "t04", q: 0, r: 1, name: "健康長照", icon: "🏥", color: "#6f7fb5" },        { id: "t05", q: -1, r: 1, name: "全民運動", icon: "⚽", color: "#71806a" },        { id: "t06", q: -1, r: 0, name: "都市綠地", icon: "🌳", color: "#8db86f" },        { id: "t07", q: 0, r: -1, name: "文化薈萃", icon: "🎨", color: "#b48560" },        { id: "t08", q: 2, r: -1, name: "青年創業", icon: "🚀", color: "#3e7c8c" },        { id: "t09", q: 1, r: 1, name: "數位治理", icon: "💻", color: "#58a6a6" },        { id: "t10", q: -2, r: 1, name: "韌性安全", icon: "🛡️", color: "#db6a41" },        { id: "t11", q: -1, r: 2, name: "環保永續", icon: "♻️", color: "#71806a" },        { id: "t12", q: 2, r: -2, name: "觀光休閒", icon: "🧳", color: "#fcea8b" }      ],      items: [        // 交通        { id: "i01", islandId: "t01", name: "捷運環狀路網擴建", desc: "完成三期環狀捷運工程，大幅縮短跨區通勤時間。", facts: ["每日運量提升 45%", "新增 18 個智慧站點", "減碳年達 12,000 噸"], timeline: "2–3 年", model: "busStop" },        { id: "i02", islandId: "t01", name: "共享自行車 3.0", desc: "全面換裝智慧電力輔助自行車與無障礙站點。", facts: ["站點密度提升 60%", "累積騎乘破千萬次", "故障率降低 30%"], timeline: "第 1 年", model: "clinic" },        { id: "i03", islandId: "t01", name: "綠色幹道動態號誌", desc: "AI 偵測車流動態調節紅綠燈，提升幹道順暢度。", facts: ["尖峰等待時間 -22%", "降低廢氣排放 15%"], timeline: "第 1 年", model: "hall" },</span></p>
-<p class="p2"><span class="s2">// 托育        { id: "i04", islandId: "t02", name: "公立托育家園倍增", desc: "活用閒置公有空間設置小型社區化托育中心。", facts: ["增加 1,200 名收托額", "師生比優化至 1:4"], timeline: "2–3 年", model: "house" },        { id: "i05", islandId: "t02", name: "夜間與緊急臨時托育", desc: "提供輪班家庭與突發狀況之彈性安全托育服務。", facts: ["覆蓋率達 100% 行政區", "申辦滿意度 96%"], timeline: "第 1 年", model: "clinic" },</span></p>
-<p class="p2"><span class="s2">// 教育        { id: "i06", islandId: "t03", name: "生生有平板學習計畫", desc: "推動互動式數位教材與程式教育全校涵蓋。", facts: ["發放 45,000 台載具", "數位學習時數 +80%"], timeline: "第 1 年", model: "school" },        { id: "i07", islandId: "t03", name: "雙語教育基石專案", desc: "引進外籍師資與國際姊妹校線上沉浸式交流。", facts: ["雙語示範學校達 50 所", "教師培訓合格率 90%"], timeline: "4 年", model: "monument" },</span></p>
-<p class="p2"><span class="s2">// 長照        { id: "i08", islandId: "t04", name: "銀髮日照綜合園區", desc: "結合復健、社交與營養餐飲的一站式長照基地。", facts: ["服務量能 +300%", "照顧者壓力指數 -40%"], timeline: "2–3 年", model: "clinic" },        { id: "i09", islandId: "t04", name: "家庭照顧者喘息服務", desc: "提供到宅關懷與短期替代照顧支援服務。", facts: ["年服務破 2 萬人次", "滿意度 98%"], timeline: "第 1 年", model: "house" },</span></p>
-<p class="p2"><span class="s2">// 運動        { id: "i10", islandId: "t05", name: "全齡多功能運動中心", desc: "配備溫水泳池、體適能中心與室內球場。", facts: ["月均入場 8 萬人次", "銀髮課程免費率 100%"], timeline: "2–3 年", model: "stadium" },        { id: "i11", islandId: "t05", name: "河濱極限與滑板公園", desc: "為青年建立國際標準專業滑板與極限運動場。", facts: ["舉辦國際賽事 3 場", "青年使用滿意度高"], timeline: "第 1 年", model: "stage" },</span></p>
-<p class="p2"><span class="s2">// 綠地        { id: "i12", islandId: "t06", name: "都市微森林生態公園", desc: "以物種多樣性為核心打造的城市綠洲吸碳島。", facts: ["新增綠地 25 公頃", "降低熱島效應 1.8°C"], timeline: "4 年", model: "farm" },        { id: "i13", islandId: "t06", name: "共融式兒童遊戲場", desc: "無障礙設計讓所有孩童皆能平等享受遊樂樂趣。", facts: ["改建 35 座公園", "榮獲國際設計獎"], timeline: "第 1 年", model: "stage" },</span></p>
-<p class="p2"><span class="s2">// 其他主題細項        { id: "i14", islandId: "t07", name: "市立美術館二館", desc: "展現現代藝術與當代數位互動裝置展演。", facts: ["年參觀人次預估 150 萬", "國際特展年辦 4 場"], timeline: "4 年", model: "monument" },        { id: "i15", islandId: "t08", name: "青創孵化基地", desc: "提供免費辦公空間、法律諮詢與創投媒合。", facts: ["成功輔導 120 家團隊", "籌資總額破 3 億"], timeline: "第 1 年", model: "hall" },        { id: "i16", islandId: "t09", name: "市民一碼通 App", desc: "整合圖書館、公共運具與規費繳納之數位身分。", facts: ["下載量突破 80 萬", "臨櫃等候時間 -50%"], timeline: "第 1 年", model: "monument" },        { id: "i17", islandId: "t10", name: "智慧防洪滯洪池", desc: "結合物聯網感測之自動化防洪排澇應變系統。", facts: ["容量高達 50 萬立方米", "減少積水風險 90%"], timeline: "2–3 年", model: "stadium" },        { id: "i18", islandId: "t11", name: "資源循環再造中心", desc: "廚餘轉化有機肥與廚餘發電示範場域。", facts: ["廚餘回收率提升至 75%", "年發電 200 萬度"], timeline: "2–3 年", model: "farm" },        { id: "i19", islandId: "t12", name: "舊城夜間漫遊光廊", desc: "運用藝術光雕重塑歷史街區夜間觀光風貌。", facts: ["帶動夜間經濟 +35%", "遊客停留時間增加 2hr"], timeline: "第 1 年", model: "stage" }      ],      flows: [        { id: "f01", from: "t02", to: "t03", item: "幼幼圖書與繪本", evidence: "official", role: "學童與家長" },        { id: "f02", from: "t01", to: "t05", item: "共享運動器材", evidence: "thematic", role: "通勤族" },        { id: "f03", from: "t04", to: "t06", item: "園藝復健藥箱", evidence: "official", role: "長者與志工" },        { id: "f04", from: "t08", to: "t09", item: "數據創新提案", evidence: "pending", role: "青創業者" },        { id: "f05", from: "t06", to: "t11", item: "堆肥與樹苗", evidence: "official", role: "養護工人" },        { id: "f06", from: "t07", to: "t12", item: "文創週邊展品", evidence: "thematic", role: "導覽員" }      ],      dayCycle: [        { hour: 6, label: "清晨", activeItems: ["i02", "i12"] },        { hour: 12, label: "白天", activeItems: ["i01", "i06", "i08", "i10", "i15"] },        { hour: 18, label: "黃昏", activeItems: ["i04", "i05", "i11", "i19"] },        { hour: 21, label: "夜晚", activeItems: ["i03", "i16", "i17"] }      ]    };</span></p>
-<p class="p2"><span class="s2">// Global Keyframe Interpolation Data for Sky and Atmosphere    const DAY_KEYFRAMES = [      { min: 0, top: "#1e2c58", horiz: "#3f4f80", sunC: "#b4c2ff", sunI: 1.15, hemiS: "#94a2d8", hemiG: "#64566a", hemiI: 1.85, night: 1, water: "#5a88b2" },      { min: 300, top: "#26365f", horiz: "#4c5688", sunC: "#b8c4ff", sunI: 1.0, hemiS: "#96a4da", hemiG: "#66586c", hemiI: 1.85, night: 1, water: "#5c8ab4" },      { min: 360, top: "#7f8fc4", horiz: "#f6c3a6", sunC: "#ffb48a", sunI: 1.3, hemiS: "#f3c6b5", hemiG: "#6b5a5a", hemiI: 1.1, night: 0.55, water: "#8fb7c4" },      { min: 450, top: "#a9d1ea", horiz: "#fbe6d3", sunC: "#ffe2c4", sunI: 2.4, hemiS: "#eaf2f6", hemiG: "#8a7a68", hemiI: 1.25, night: 0, water: "#9fcfd6" },      { min: 720, top: "#9fd0ec", horiz: "#f4eee3", sunC: "#fff1de", sunI: 2.9, hemiS: "#eef6fa", hemiG: "#8f8270", hemiI: 1.35, night: 0, water: "#a9d8db" },      { min: 960, top: "#a6cfe6", horiz: "#f8e7d2", sunC: "#ffe3c0", sunI: 2.5, hemiS: "#f1efe8", hemiG: "#8a7a66", hemiI: 1.25, night: 0, water: "#9fcbd2" },      { min: 1065, top: "#8b8fc4", horiz: "#f7b98f", sunC: "#ff9f6a", sunI: 1.8, hemiS: "#f6d2bc", hemiG: "#7d6660", hemiI: 1.2, night: 0.3, water: "#93a9bd" },      { min: 1140, top: "#5a5e9e", horiz: "#d99aa6", sunC: "#ff9a7a", sunI: 1.3, hemiS: "#c0b2e0", hemiG: "#655868", hemiI: 1.35, night: 0.75, water: "#6a7cab" },      { min: 1260, top: "#22325f", horiz: "#445488", sunC: "#c0ccff", sunI: 1.2, hemiS: "#98a8dc", hemiG: "#685a6e", hemiI: 1.9, night: 1, water: "#5a88b2" },      { min: 1440, top: "#1e2c58", horiz: "#3f4f80", sunC: "#b4c2ff", sunI: 1.15, hemiS: "#94a2d8", hemiG: "#64566a", hemiI: 1.85, night: 1, water: "#5a88b2" }    ];</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // World Constants    // ------------------------------------------------------------------    const R = 2.02;    const SPACING = 2.28;    const TOP = 0.65;    const WATER_Y = -0.18;</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // Application State &amp; Main WebGL Setup    // ------------------------------------------------------------------    let scene, camera, renderer, cssRenderer, controls, simplex;    let skyMesh, skyUniforms, waterMesh, waterUniforms, sunLight, hemiLight;    let islandMap = new Map();    let itemMeshMap = new Map();    let kitInstances = new Map(); // Dynamic/Static Instanced Mesh Kit    let walkers = [];    let flowTubes = [];    let currentTimeMinutes = 600; // Default 10:00 AM    let isBirdView = false;    let isFlowVisible = false;    let selectedIsland = null;    let selectedItem = null;    let isAnimatingCam = false;    let camAnimStartTime = 0;    let camStartPos = new THREE.Vector3(), camTargetPos = new THREE.Vector3();    let camStartLook = new THREE.Vector3(), camTargetLook = new THREE.Vector3();</span></p>
-<p class="p2"><span class="s2">// Init Logic with Robust Exception Handling    window.addEventListener('DOMContentLoaded', () =&gt; {      try {        initApp();      } catch (err) {        console.error("Initialization Failed:", err);        const errBox = document.getElementById('error-box');        errBox.style.display = 'block';        errBox.innerText = '系統初始化失敗：' + err.message + '。請確保瀏覽器支援 WebGL2。';        document.querySelector('.spinner').style.display = 'none';      }    });</span></p>
-<p class="p2"><span class="s2">function initApp() {      // 1. Core Renderer Setup      const container = document.getElementById('canvas-container');      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));      renderer.setSize(window.innerWidth, window.innerHeight);      renderer.shadowMap.enabled = true;      renderer.shadowMap.type = THREE.PCFSoftShadowMap;      renderer.toneMapping = THREE.ACESFilmicToneMapping;      renderer.toneMappingExposure = 1.0;      renderer.outputColorSpace = THREE.SRGBColorSpace;      container.appendChild(renderer.domElement);</span></p>
-<p class="p2"><span class="s2">// CSS 2D Label Renderer      cssRenderer = new CSS2DRenderer();      cssRenderer.setSize(window.innerWidth, window.innerHeight);      cssRenderer.domElement.style.position = 'absolute';      cssRenderer.domElement.style.top = '0px';      cssRenderer.domElement.style.pointerEvents = 'none';      container.appendChild(cssRenderer.domElement);</span></p>
-<p class="p2"><span class="s2">// Scene &amp; Camera      scene = new THREE.Scene();      scene.fog = new THREE.Fog(0xf4eee3, 42, 150);</span></p>
-<p class="p2"><span class="s2">camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 0.3, 320);      camera.position.set(20, 28, 35);</span></p>
-<p class="p2"><span class="s2">controls = new OrbitControls(camera, renderer.domElement);      controls.enableDamping = true;      controls.dampingFactor = 0.07;      controls.enablePan = false;      controls.minPolarAngle = THREE.MathUtils.degToRad(25);      controls.maxPolarAngle = THREE.MathUtils.degToRad(70);      controls.minDistance = 3;      controls.maxDistance = 70;      controls.target.set(0, 0, 0);</span></p>
-<p class="p2"><span class="s2">simplex = new SimplexNoise(random);</span></p>
-<p class="p2"><span class="s2">// 2. Build World Infrastructure      buildSkyAndLighting();      buildWater();      buildTerrainAndDistantMountains();      buildCityIslands();      buildKitAndBuildings();      buildWalkersAndFlows();</span></p>
-<p class="p2"><span class="s2">// 3. Setup UI &amp; Event Listeners      setupUI();      setupInteractions();</span></p>
-<p class="p2"><span class="s2">// Fade out Loading Screen      setTimeout(() =&gt; {        const overlay = document.getElementById('loading-overlay');        overlay.style.opacity = '0';        setTimeout(() =&gt; overlay.style.display = 'none', 600);      }, 500);</span></p>
-<p class="p2"><span class="s2">// Check LocalStorage for First Visit Guide      try {        if (!localStorage.getItem('policy_island_visited')) {          document.getElementById('guide-modal').style.display = 'flex';        }      } catch (e) { /* Ignore privacy storage block */ }</span></p>
-<p class="p2"><span class="s2">// Animation Loop      window.addEventListener('resize', onWindowResize);      renderer.setAnimationLoop(animate);    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // Hexagon Coordinate Helper (Axial -&gt; World)    // ------------------------------------------------------------------    function axialToWorld(q, r) {      const x = Math.sqrt(3) * SPACING * (q + r / 2);      const z = 1.5 * SPACING * r;      return { x, z };    }</span></p>
-<p class="p2"><span class="s2">// Procedural Ground Canvas Texture    function createGroundCanvasTexture(type) {      const canvas = document.createElement('canvas');      canvas.width = 256; canvas.height = 256;      const ctx = canvas.getContext('2d');      ctx.fillStyle = "#e8dac8";      ctx.fillRect(0, 0, 256, 256);</span></p>
-<p class="p2"><span class="s2">if (type === 0) { // Brick Pattern        ctx.strokeStyle = "rgba(180, 150, 120, 0.25)";        ctx.lineWidth = 4;        for (let i = 0; i &lt; 256; i += 32) {          ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();          for (let j = 0; j &lt; 256; j += 32) {            ctx.beginPath(); ctx.moveTo(j + (i % 64 ? 16 : 0), i); ctx.lineTo(j + (i % 64 ? 16 : 0), i + 32); ctx.stroke();          }        }      } else if (type === 1) { // Dots        ctx.fillStyle = "rgba(160, 130, 100, 0.15)";        for (let x = 16; x &lt; 256; x += 32) {          for (let y = 16; y &lt; 256; y += 32) {            ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();          }        }      } else { // Stripes        ctx.strokeStyle = "rgba(170, 140, 110, 0.2)";        ctx.lineWidth = 6;        for (let i = -256; i &lt; 512; i += 24) {          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 256, 256); ctx.stroke();        }      }      const tex = new THREE.CanvasTexture(canvas);      tex.wrapS = THREE.RepeatWrapping;      tex.wrapT = THREE.RepeatWrapping;      return tex;    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // Sky Shader, Lighting &amp; Atmosphere    // ------------------------------------------------------------------    function buildSkyAndLighting() {      // Hemisphere &amp; Directional Sun Light      hemiLight = new THREE.HemisphereLight(0xeef6fa, 0x8f8270, 1.3);      scene.add(hemiLight);</span></p>
-<p class="p2"><span class="s2">sunLight = new THREE.DirectionalLight(0xfff1de, 2.8);      sunLight.castShadow = true;      sunLight.shadow.mapSize.width = 2048;      sunLight.shadow.mapSize.height = 2048;      sunLight.shadow.camera.near = 1;      sunLight.shadow.camera.far = 90;      sunLight.shadow.camera.left = -20;      sunLight.shadow.camera.right = 20;      sunLight.shadow.camera.top = 22;      sunLight.shadow.camera.bottom = -22;      sunLight.shadow.bias = -0.0006;      sunLight.shadow.normalBias = 0.045;      sunLight.shadow.radius = 3;      scene.add(sunLight);</span></p>
-<p class="p2"><span class="s2">const fillLight = new THREE.DirectionalLight(0xbfd6ff, 0.35);      fillLight.position.set(-20, 15, -20);      scene.add(fillLight);</span></p>
-<p class="p2"><span class="s2">// Sky Atmosphere Sphere Shader      const skyGeo = new THREE.SphereGeometry(170, 32, 15);      skyUniforms = {        uTop: { value: new THREE.Color() },        uHorizon: { value: new THREE.Color() },        uSunDir: { value: new THREE.Vector3() },        uNight: { value: 0 }      };</span></p>
-<p class="p2"><span class="s2">const skyMat = new THREE.ShaderMaterial({        uniforms: skyUniforms,        side: THREE.BackSide,        depthWrite: false,        vertexShader: `          varying vec3 vWorldPosition;          void main() {            vec4 worldPosition = modelMatrix * vec4(position, 1.0);            vWorldPosition = worldPosition.xyz;            gl_Position = projectionMatrix * viewMatrix * worldPosition;          }        `,        fragmentShader: `          uniform vec3 uTop;          uniform vec3 uHorizon;          uniform vec3 uSunDir;          uniform float uNight;          varying vec3 vWorldPosition;</span></p>
-<p class="p2"><span class="s2">float hash(vec3 p) {            p  = fract(p * 0.3183099 + .1);            p *= 17.0;            return fract(p.x * p.y * p.z * (p.x + p.y + p.z));          }</span></p>
-<p class="p2"><span class="s2">void main() {            vec3 dir = normalize(vWorldPosition);            float h = smoothstep(-0.02, 0.55, dir.y);            vec3 col = mix(uHorizon, uTop, h);</span></p>
-<p class="p2"><span class="s2">// Sun Glow            float sunDot = max(0.0, dot(dir, uSunDir));            col += vec3(1.0, 0.8, 0.5) * pow(sunDot, 18.0) * 0.35;</span></p>
-<p class="p2"><span class="s2">// Night Stars            if (uNight &gt; 0.1) {              vec3 starP = floor(dir * 180.0);              if (hash(starP) &gt; 0.9965 &amp;&amp; dir.y &gt; 0.1) {                col += vec3(0.9, 0.95, 1.0) * uNight * (0.5 + 0.5 * sin(dir.x * 100.0));              }            }            gl_FragColor = vec4(col, 1.0);          }        `      });      skyMesh = new THREE.Mesh(skyGeo, skyMat);      scene.add(skyMesh);    }</span></p>
-<p class="p2"><span class="s2">// Dynamic Shader Water Plane    function buildWater() {      const waterGeo = new THREE.CircleGeometry(160, 64);      waterGeo.rotateX(-Math.PI / 2);</span></p>
-<p class="p2"><span class="s2">waterUniforms = {        uTime: { value: 0 },        uWaterColor: { value: new THREE.Color("#a4d4da") },        fogColor: { value: scene.fog.color },        fogNear: { value: scene.fog.near },        fogFar: { value: scene.fog.far }      };</span></p>
-<p class="p2"><span class="s2">const waterMat = new THREE.ShaderMaterial({        uniforms: waterUniforms,        vertexShader: `          varying vec3 vWorldPos;          void main() {            vec4 wp = modelMatrix * vec4(position, 1.0);            vWorldPos = wp.xyz;            gl_Position = projectionMatrix * viewMatrix * wp;          }        `,        fragmentShader: `          uniform float uTime;          uniform vec3 uWaterColor;          uniform vec3 fogColor;          uniform float fogNear;          uniform float fogFar;          varying vec3 vWorldPos;</span></p>
-<p class="p2"><span class="s2">void main() {            float wave = sin(vWorldPos.x * 0.4 + uTime * 1.2) * cos(vWorldPos.z * 0.4 + uTime * 1.5) * 0.5 + 0.5;            vec3 col = mix(uWaterColor, uWaterColor * 0.8, wave);                        // Distance fog blend            float dist = length(vWorldPos.xz);            float fogFactor = smoothstep(fogNear, fogFar, dist);            col = mix(col, fogColor, fogFactor);</span></p>
-<p class="p2"><span class="s2">gl_FragColor = vec4(col, 1.0);          }        `      });</span></p>
-<p class="p2"><span class="s2">waterMesh = new THREE.Mesh(waterGeo, waterMat);      waterMesh.position.y = WATER_Y;      waterMesh.receiveShadow = true;      scene.add(waterMesh);    }</span></p>
-<p class="p2"><span class="s2">// Background Basin Terrain &amp; Distant Mountains    function buildTerrainAndDistantMountains() {      const terrainGeo = new THREE.PlaneGeometry(170, 170, 120, 120);      terrainGeo.rotateX(-Math.PI / 2);      const pos = terrainGeo.attributes.position;      const colors = [];</span></p>
-<p class="p2"><span class="s2">const cRiver = new THREE.Color("#8fb3ad");      const cSand  = new THREE.Color("#d9c9a3");      const cFarm  = new THREE.Color("#aec493");      const cGrass = new THREE.Color("#a3b986");      const cForest= new THREE.Color("#6f8a62");      const cRock  = new THREE.Color("#b2a38d");</span></p>
-<p class="p2"><span class="s2">for (let i = 0; i &lt; pos.count; i++) {        const x = pos.getX(i);        const z = pos.getZ(i);        const dist = Math.sqrt(x * x + z * z);                // Ring Mountains Ring Formation        let h = 0;        if (dist &gt; 25) {          const ringFactor = THREE.MathUtils.smoothstep(dist, 25, 55);          const n = simplex.noise2D(x * 0.03, z * 0.03);          h = ringFactor * (12 + n * 18);          if (z &gt; 20) h *= 0.3; // Flatten front camera view        }</span></p>
-<p class="p2"><span class="s2">pos.setY(i, h);</span></p>
-<p class="p2"><span class="s2">// Vertex Color Grading based on elevation        let col = cGrass;        if (h &lt; 0.2) col = cRiver;        else if (h &lt; 1.5) col = cSand;        else if (h &lt; 4.0) col = cFarm;        else if (h &lt; 12.0) col = cForest;        else col = cRock;</span></p>
-<p class="p2"><span class="s2">colors.push(col.r, col.g, col.b);      }</span></p>
-<p class="p2"><span class="s2">terrainGeo.computeVertexNormals();      terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));</span></p>
-<p class="p2"><span class="s2">const terrainMat = new THREE.MeshStandardMaterial({        vertexColors: true,        roughness: 0.9,        flatShading: true      });</span></p>
-<p class="p2"><span class="s2">const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);      terrainMesh.position.y = -0.5;      scene.add(terrainMesh);    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // 2. City Islands &amp; Bridge Infrastructure    // ------------------------------------------------------------------    function buildCityIslands() {      const tex0 = createGroundCanvasTexture(0);      const tex1 = createGroundCanvasTexture(1);      const tex2 = createGroundCanvasTexture(2);      const textures = [tex0, tex1, tex2];</span></p>
-<p class="p2"><span class="s2">const hexShapeGeo = new THREE.CircleGeometry(R - 0.05, 6);      hexShapeGeo.rotateZ(Math.PI / 6);      hexShapeGeo.rotateX(-Math.PI / 2);</span></p>
-<p class="p2"><span class="s2">DATA.islands.forEach((isData, idx) =&gt; {        const { x, z } = axialToWorld(isData.q, isData.r);        const group = new THREE.Group();        group.position.set(x, TOP, z);</span></p>
-<p class="p2"><span class="s2">// Ground Top Top Plane        const groundMat = new THREE.MeshStandardMaterial({          map: textures[idx % 3],          roughness: 0.92,          polygonOffset: true,          polygonOffsetFactor: -1        });        const groundMesh = new THREE.Mesh(hexShapeGeo, groundMat);        groundMesh.receiveShadow = true;        group.add(groundMesh);</span></p>
-<p class="p2"><span class="s2">// Ring Pedestrian Walkway        const ringGeo = new THREE.RingGeometry(1.52, 1.8, 6);        ringGeo.rotateZ(Math.PI / 6);        ringGeo.rotateX(-Math.PI / 2);        const ringMat = new THREE.MeshStandardMaterial({ color: 0xd3b89c, roughness: 0.85 });        const ringMesh = new THREE.Mesh(ringGeo, ringMat);        ringMesh.position.y = 0.005;        ringMesh.receiveShadow = true;        group.add(ringMesh);</span></p>
-<p class="p2"><span class="s2">// Island Side Wall Platform        const wallGeo = new THREE.CylinderGeometry(R, R * 0.92, TOP - WATER_Y, 6);        const wallMat = new THREE.MeshStandardMaterial({ color: 0xe4d6c3, roughness: 0.8 });        const wallMesh = new THREE.Mesh(wallGeo, wallMat);        wallMesh.position.y = -(TOP - WATER_Y) / 2;        wallMesh.castShadow = true;        wallMesh.receiveShadow = true;        group.add(wallMesh);</span></p>
-<p class="p2"><span class="s2">// Outer Foam Ring        const foamGeo = new THREE.RingGeometry(R + 0.02, R + 0.22, 6);        foamGeo.rotateZ(Math.PI / 6);        foamGeo.rotateX(-Math.PI / 2);        const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });        const foamMesh = new THREE.Mesh(foamGeo, foamMat);        foamMesh.position.y = WATER_Y - TOP + 0.01;        group.add(foamMesh);</span></p>
-<p class="p2"><span class="s2">// CSS 2D Label        const labelDiv = document.createElement('div');        labelDiv.className = 'island-label';        labelDiv.innerText = `${isData.name}`;        labelDiv.addEventListener('click', () =&gt; selectIsland(isData.id));</span></p>
-<p class="p2"><span class="s2">const cssLabel = new CSS2DObject(labelDiv);        cssLabel.position.set(0, 0.3, R * 0.85);        group.add(cssLabel);</span></p>
-<p class="p2"><span class="s2">scene.add(group);        islandMap.set(isData.id, { data: isData, group, worldPos: new THREE.Vector3(x, TOP, z) });      });</span></p>
-<p class="p2"><span class="s2">// Build Connecting Bridges Between Adjacent Islands      DATA.islands.forEach(a =&gt; {        DATA.islands.forEach(b =&gt; {          if (a.id &lt; b.id) {            const dq = Math.abs(a.q - b.q);            const dr = Math.abs(a.r - b.r);            const ds = Math.abs((-a.q - a.r) - (-b.q - b.r));            if ((dq === 1 &amp;&amp; dr === 0) || (dq === 0 &amp;&amp; dr === 1) || (dq === 1 &amp;&amp; dr === 1 &amp;&amp; ds === 0)) {              buildBridge(a, b);            }          }        });      });    }</span></p>
-<p class="p2"><span class="s2">function buildBridge(isA, isB) {      const posA = axialToWorld(isA.q, isA.r);      const posB = axialToWorld(isB.q, isB.r);      const start = new THREE.Vector3(posA.x, TOP, posA.z);      const end = new THREE.Vector3(posB.x, TOP, posB.z);</span></p>
-<p class="p2"><span class="s2">const dist = start.distanceTo(end);      const bridgeGroup = new THREE.Group();      bridgeGroup.position.copy(start).lerp(end, 0.5);      bridgeGroup.lookAt(end);</span></p>
-<p class="p2"><span class="s2">const deckGeo = new THREE.BoxGeometry(0.5, 0.08, dist * 0.52);      const deckMat = new THREE.MeshStandardMaterial({ color: 0xb48560, roughness: 0.8 });      const deckMesh = new THREE.Mesh(deckGeo, deckMat);      deckMesh.position.y = 0.02;      deckMesh.castShadow = true;      bridgeGroup.add(deckMesh);</span></p>
-<p class="p2"><span class="s2">scene.add(bridgeGroup);    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // 5. Instanced Building Kit Archetypes    // ------------------------------------------------------------------    function buildKitAndBuildings() {      // Create Base Archetype Models for Items      DATA.items.forEach((item, index) =&gt; {        const island = islandMap.get(item.islandId);        if (!island) return;</span></p>
-<p class="p2"><span class="s2">const itemGroup = new THREE.Group();</span></p>
-<p class="p2"><span class="s2">// Calculate Position on Grid inside Island        const angle = (index * 2.1) % (Math.PI * 2);        const radius = 0.4 + (index % 3) * 0.35;        const lx = Math.cos(angle) * radius;        const lz = Math.sin(angle) * radius - 0.2;</span></p>
-<p class="p2"><span class="s2">itemGroup.position.set(island.worldPos.x + lx, TOP, island.worldPos.z + lz);</span></p>
-<p class="p2"><span class="s2">// Construct 3D Clay Style Model by Kind        let modelMesh;        const baseColor = new THREE.Color(island.data.color);</span></p>
-<p class="p2"><span class="s2">switch (item.model) {          case 'school':            modelMesh = createClayBuilding(0.6, 0.7, 0.5, baseColor, 0x4a6fa5);            break;          case 'clinic':            modelMesh = createClayBuilding(0.5, 0.5, 0.5, new THREE.Color(0xffffff), 0xdb6a41);            break;          case 'busStop':            modelMesh = createBusStopModel();            break;          case 'stadium':            modelMesh = createDomeModel(baseColor);            break;          case 'stage':            modelMesh = createStageModel();            break;          case 'monument':            modelMesh = createMonumentModel();            break;          default:            modelMesh = createClayBuilding(0.45, 0.55, 0.45, baseColor, 0xfcea8b);            break;        }</span></p>
-<p class="p2"><span class="s2">itemGroup.add(modelMesh);</span></p>
-<p class="p2"><span class="s2">// Number Pin Indicator        const pinDiv = document.createElement('div');        pinDiv.className = 'item-pin';        pinDiv.innerText = `${(index % 5) + 1}`;        pinDiv.addEventListener('click', (e) =&gt; {          e.stopPropagation();          selectItem(item.id);        });</span></p>
-<p class="p2"><span class="s2">const cssPin = new CSS2DObject(pinDiv);        cssPin.position.set(0, 0.9, 0);        itemGroup.add(cssPin);</span></p>
-<p class="p2"><span class="s2">scene.add(itemGroup);        itemMeshMap.set(item.id, { data: item, group: itemGroup, mesh: modelMesh, originalColor: baseColor.clone() });      });    }</span></p>
-<p class="p2"><span class="s2">// Helper Clay Building Creators    function createClayBuilding(w, h, d, wallColor, roofHex) {      const g = new THREE.Group();</span></p>
-<p class="p2"><span class="s2">// Main Clay Body Wall      const wallGeo = new RoundedBoxGeometry(w, h, d, 2, 0.08);      const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.78 });      const wall = new THREE.Mesh(wallGeo, wallMat);      wall.position.y = h / 2;      wall.castShadow = true;      wall.receiveShadow = true;      g.add(wall);</span></p>
-<p class="p2"><span class="s2">// Pitch Roof      const roofGeo = new THREE.ConeGeometry(Math.max(w, d) * 0.75, 0.35, 4);      roofGeo.rotateY(Math.PI / 4);      const roofMat = new THREE.MeshStandardMaterial({ color: roofHex, roughness: 0.75 });      const roof = new THREE.Mesh(roofGeo, roofMat);      roof.position.y = h + 0.15;      roof.castShadow = true;      g.add(roof);</span></p>
-<p class="p2"><span class="s2">return g;    }</span></p>
-<p class="p2"><span class="s2">function createBusStopModel() {      const g = new THREE.Group();      const benchGeo = new RoundedBoxGeometry(0.4, 0.15, 0.2, 2, 0.02);      const benchMat = new THREE.MeshStandardMaterial({ color: 0xb48560, roughness: 0.8 });      const bench = new THREE.Mesh(benchGeo, benchMat);      bench.position.y = 0.08;      g.add(bench);</span></p>
-<p class="p2"><span class="s2">const signGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.6);      const signMat = new THREE.MeshStandardMaterial({ color: 0x211d1d });      const sign = new THREE.Mesh(signGeo, signMat);      sign.position.set(0.25, 0.3, 0);      g.add(sign);</span></p>
-<p class="p2"><span class="s2">return g;    }</span></p>
-<p class="p2"><span class="s2">function createDomeModel(color) {      const g = new THREE.Group();      const domeGeo = new THREE.SphereGeometry(0.4, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);      const domeMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7 });      const dome = new THREE.Mesh(domeGeo, domeMat);      dome.position.y = 0.1;      dome.castShadow = true;      g.add(dome);      return g;    }</span></p>
-<p class="p2"><span class="s2">function createStageModel() {      const g = new THREE.Group();      const stageGeo = new THREE.CylinderGeometry(0.5, 0.55, 0.12, 12);      const stageMat = new THREE.MeshStandardMaterial({ color: 0xfcea8b, roughness: 0.8 });      const stage = new THREE.Mesh(stageGeo, stageMat);      stage.position.y = 0.06;      g.add(stage);      return g;    }</span></p>
-<p class="p2"><span class="s2">function createMonumentModel() {      const g = new THREE.Group();      const monGeo = new THREE.BoxGeometry(0.2, 0.8, 0.2);      const monMat = new THREE.MeshStandardMaterial({ color: 0x3e7c8c, roughness: 0.6 });      const mon = new THREE.Mesh(monGeo, monMat);      mon.position.y = 0.4;      mon.castShadow = true;      g.add(mon);      return g;    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // 6. Chibi Walkers &amp; Flow Connection Tubes    // ------------------------------------------------------------------    function buildWalkersAndFlows() {      DATA.flows.forEach(flow =&gt; {        const isFrom = islandMap.get(flow.from);        const isTo = islandMap.get(flow.to);        if (!isFrom || !isTo) return;</span></p>
-<p class="p2"><span class="s2">// Tube Curve Path        const pA = isFrom.worldPos.clone().add(new THREE.Vector3(0, 0.1, 0));        const pB = isTo.worldPos.clone().add(new THREE.Vector3(0, 0.1, 0));        const mid = pA.clone().add(pB).multiplyScalar(0.5).add(new THREE.Vector3(0, 0.8, 0));</span></p>
-<p class="p2"><span class="s2">const curve = new THREE.QuadraticBezierCurve3(pA, mid, pB);        const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.035, 8, false);</span></p>
-<p class="p2"><span class="s2">const flowMat = new THREE.ShaderMaterial({          transparent: true,          uniforms: {            uTime: { value: 0 },            uColor: { value: new THREE.Color("#db6a41") },            uStyle: { value: flow.evidence === 'official' ? 0 : (flow.evidence === 'thematic' ? 1 : 2) }          },          vertexShader: `            varying vec2 vUv;            void main() {              vUv = uv;              gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);            }          `,          fragmentShader: `            uniform float uTime;            uniform vec3 uColor;            uniform int uStyle;            varying vec2 vUv;</span></p>
-<p class="p2"><span class="s2">void main() {              float u = vUv.x * 25.0 - uTime * 3.0;              float alpha = 0.82;</span></p>
-<p class="p2"><span class="s2">if (uStyle == 1 &amp;&amp; fract(u) &gt; 0.6) discard; // Dashed              if (uStyle == 2 &amp;&amp; fract(u) &gt; 0.3) discard; // Dotted</span></p>
-<p class="p2"><span class="s2">gl_FragColor = vec4(uColor, alpha);            }          `        });</span></p>
-<p class="p2"><span class="s2">const tubeMesh = new THREE.Mesh(tubeGeo, flowMat);        tubeMesh.visible = false; // Hidden by default        scene.add(tubeMesh);        flowTubes.push({ data: flow, mesh: tubeMesh, mat: flowMat });</span></p>
-<p class="p2"><span class="s2">// Add Chibi Walker Character        createChibiWalker(curve, flow);      });    }</span></p>
-<p class="p2"><span class="s2">function createChibiWalker(curvePath, flowData) {      const walkerGroup = new THREE.Group();</span></p>
-<p class="p2"><span class="s2">// Head (Sphere)      const headGeo = new THREE.SphereGeometry(0.12, 12, 12);      const headMat = new THREE.MeshStandardMaterial({ color: 0xffdfc4, roughness: 0.8 });      const head = new THREE.Mesh(headGeo, headMat);      head.position.y = 0.28;      walkerGroup.add(head);</span></p>
-<p class="p2"><span class="s2">// Body Capsule      const bodyGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.16, 8);      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xdb6a41, roughness: 0.8 });      const body = new THREE.Mesh(bodyGeo, bodyMat);      body.position.y = 0.12;      walkerGroup.add(body);</span></p>
-<p class="p2"><span class="s2">scene.add(walkerGroup);</span></p>
-<p class="p2"><span class="s2">walkers.push({        group: walkerGroup,        path: curvePath,        progress: random(),        speed: 0.08 + random() * 0.04,        flow: flowData      });    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // 8. Interaction System &amp; Camera Controls    // ------------------------------------------------------------------    function setupInteractions() {      const raycaster = new THREE.Raycaster();      const mouse = new THREE.Vector2();      let pointerDownPos = { x: 0, y: 0 };</span></p>
-<p class="p2"><span class="s2">window.addEventListener('pointerdown', (e) =&gt; {        pointerDownPos = { x: e.clientX, y: e.clientY };      });</span></p>
-<p class="p2"><span class="s2">window.addEventListener('pointerup', (e) =&gt; {        const dx = Math.abs(e.clientX - pointerDownPos.x);        const dy = Math.abs(e.clientY - pointerDownPos.y);        if (dx &gt; 6 || dy &gt; 6) return; // Ignore drag clicks</span></p>
-<p class="p2"><span class="s2">mouse.x = (e.clientX / window.innerWidth) * 2 - 1;        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;</span></p>
-<p class="p2"><span class="s2">raycaster.setFromCamera(mouse, camera);</span></p>
-<p class="p2"><span class="s2">// Raycast against Item Buildings        const intersects = raycaster.intersectObjects(scene.children, true);        if (intersects.length &gt; 0) {          let obj = intersects[0].object;          while (obj.parent &amp;&amp; obj.parent !== scene) {            obj = obj.parent;          }                    // Check if item building was clicked          for (let [id, itemObj] of itemMeshMap.entries()) {            if (itemObj.group === obj) {              selectItem(id);              return;            }          }        }      });</span></p>
-<p class="p2"><span class="s2">// Camera Reset Button      document.getElementById('btn-reset-cam').addEventListener('click', resetCamera);    }</span></p>
-<p class="p2"><span class="s2">function selectIsland(id) {      const island = islandMap.get(id);      if (!island) return;</span></p>
-<p class="p2"><span class="s2">selectedIsland = id;      selectedItem = null;</span></p>
-<p class="p2"><span class="s2">// Highlight Selected Label      document.querySelectorAll('.island-label').forEach(lbl =&gt; lbl.classList.remove('selected'));</span></p>
-<p class="p2"><span class="s2">// Smooth Fly Camera      flyCameraTo(island.worldPos.clone().add(new THREE.Vector3(2.75, 5.3, 6.2)), island.worldPos);</span></p>
-<p class="p2"><span class="s2">// Open Info Card      showInfoCard('island', island.data);      addLiveLog(`聚焦政策主題：${island.data.name}`);    }</span></p>
-<p class="p2"><span class="s2">function selectItem(id) {      const itemObj = itemMeshMap.get(id);      if (!itemObj) return;</span></p>
-<p class="p2"><span class="s2">selectedItem = id;      const targetPos = itemObj.group.position.clone();</span></p>
-<p class="p2"><span class="s2">flyCameraTo(targetPos.clone().add(new THREE.Vector3(1.6, 2.5, 3.2)), targetPos);</span></p>
-<p class="p2"><span class="s2">showInfoCard('item', itemObj.data);      addLiveLog(`查看細項政策：${itemObj.data.name}`);    }</span></p>
-<p class="p2"><span class="s2">function flyCameraTo(targetCamPos, targetLookAt) {      camStartPos.copy(camera.position);      camStartLook.copy(controls.target);</span></p>
-<p class="p2"><span class="s2">camTargetPos.copy(targetCamPos);      camTargetLook.copy(targetLookAt);</span></p>
-<p class="p2"><span class="s2">isAnimatingCam = true;      camAnimStartTime = performance.now();    }</span></p>
-<p class="p2"><span class="s2">function resetCamera() {      isBirdView = false;      flyCameraTo(new THREE.Vector3(20, 28, 35), new THREE.Vector3(0, 0, 0));      document.getElementById('info-card').classList.remove('active');    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // UI Cards &amp; Sidebar Setup    // ------------------------------------------------------------------    function setupUI() {      const sidebarList = document.getElementById('sidebar-list');</span></p>
-<p class="p2"><span class="s2">// Populate Sidebar Themes      DATA.islands.forEach(is =&gt; {        const items = DATA.items.filter(it =&gt; it.islandId === is.id);</span></p>
-<p class="p2"><span class="s2">const details = document.createElement('details');        details.className = 'theme-group';        details.innerHTML = `          &lt;summary&gt;            &lt;span&gt;${is.icon} ${is.name}&lt;/span&gt;            &lt;span class="badge-num"&gt;${items.length}&lt;/span&gt;          &lt;/summary&gt;          &lt;div class="item-list"&gt;            ${items.map((it, idx) =&gt; `              &lt;div class="item-row" data-id="${it.id}"&gt;                &lt;span class="badge-num" style="background:#8a7a68"&gt;${idx + 1}&lt;/span&gt;                &lt;span&gt;${it.name}&lt;/span&gt;              &lt;/div&gt;            `).join('')}          &lt;/div&gt;        `;        sidebarList.appendChild(details);      });</span></p>
-<p class="p2"><span class="s2">// Sidebar Event Delegation      sidebarList.addEventListener('click', (e) =&gt; {        const row = e.target.closest('.item-row');        if (row) {          selectItem(row.dataset.id);        }      });</span></p>
-<p class="p2"><span class="s2">// HUD Button Listeners      document.getElementById('btn-time-6').addEventListener('click', () =&gt; setTime(360));      document.getElementById('btn-time-12').addEventListener('click', () =&gt; setTime(720));      document.getElementById('btn-time-18').addEventListener('click', () =&gt; setTime(1080));      document.getElementById('btn-time-21').addEventListener('click', () =&gt; setTime(1260));</span></p>
-<p class="p2"><span class="s2">document.getElementById('btn-toggle-flows').addEventListener('click', (e) =&gt; {        isFlowVisible = !isFlowVisible;        e.currentTarget.classList.toggle('active', isFlowVisible);        flowTubes.forEach(ft =&gt; ft.mesh.visible = isFlowVisible);      });</span></p>
-<p class="p2"><span class="s2">document.getElementById('btn-toggle-bird').addEventListener('click', () =&gt; {        isBirdView = !isBirdView;        if (isBirdView) {          flyCameraTo(new THREE.Vector3(0.01, 42, 6), new THREE.Vector3(0, 0, 0));        } else {          resetCamera();        }      });</span></p>
-<p class="p2"><span class="s2">document.getElementById('btn-close-info').addEventListener('click', () =&gt; {        document.getElementById('info-card').classList.remove('active');      });</span></p>
-<p class="p2"><span class="s2">document.getElementById('btn-close-guide').addEventListener('click', () =&gt; {        document.getElementById('guide-modal').style.display = 'none';        try { localStorage.setItem('policy_island_visited', 'true'); } catch (e) {}      });</span></p>
-<p class="p2"><span class="s2">document.getElementById('btn-toggle-guide').addEventListener('click', () =&gt; {        document.getElementById('guide-modal').style.display = 'flex';      });    }</span></p>
-<p class="p2"><span class="s2">function showInfoCard(type, data) {      const card = document.getElementById('info-card');      const title = document.getElementById('card-title');      const subtitle = document.getElementById('card-subtitle');      const content = document.getElementById('card-content');</span></p>
-<p class="p2"><span class="s2">card.classList.add('active');</span></p>
-<p class="p2"><span class="s2">if (type === 'island') {        title.innerText = `${data.icon} ${data.name}`;        subtitle.innerText = "政策主題概覽";        const items = DATA.items.filter(it =&gt; it.islandId === data.id);</span></p>
-<p class="p2"><span class="s2">content.innerHTML = `          &lt;p style="font-size:0.9rem; color:#555; margin-bottom:15px;"&gt;本島嶼包含 ${items.length} 項核心重點施政計畫，按數字標籤可展開細節。&lt;/p&gt;          &lt;h4 style="font-size:0.85rem; font-weight:800; margin-bottom:8px;"&gt;包含政策細項：&lt;/h4&gt;          ${items.map((it, idx) =&gt; `            &lt;div style="background:#fff; padding:10px 12px; border-radius:10px; margin-bottom:6px; font-size:0.85rem; border:1px solid rgba(0,0,0,0.04);"&gt;              &lt;b&gt;${idx + 1}. ${it.name}&lt;/b&gt;              &lt;div style="font-size:0.75rem; color:#8a7a68; margin-top:2px;"&gt;${it.desc}&lt;/div&gt;            &lt;/div&gt;          `).join('')}        `;      } else if (type === 'item') {        title.innerText = data.name;        subtitle.innerText = `預計時程：${data.timeline}`;</span></p>
-<p class="p2"><span class="s2">content.innerHTML = `          &lt;p style="font-size:0.9rem; line-height:1.4; color:#444; margin-bottom:12px;"&gt;${data.desc}&lt;/p&gt;          &lt;div class="metric-grid"&gt;            ${data.facts.map(f =&gt; {              const parts = f.match(/([^\d-]*)([\d,%\.\+-]+)(.*)/) || [null, '', f, ''];              return `                &lt;div class="metric-brick"&gt;                  &lt;div class="metric-val"&gt;${parts[2] || ''}&lt;/div&gt;                  &lt;div class="metric-lbl"&gt;${parts[1] + parts[3]}&lt;/div&gt;                &lt;/div&gt;              `;            }).join('')}          &lt;/div&gt;        `;      }    }</span></p>
-<p class="p2"><span class="s2">function addLiveLog(msg) {      const logList = document.getElementById('log-list');      const item = document.createElement('div');      item.className = 'log-item';      item.innerText = msg;      logList.prepend(item);    }</span></p>
-<p class="p2"><span class="s2">function setTime(mins) {      currentTimeMinutes = mins;      document.querySelectorAll('#hud-toolbar .hud-btn').forEach(btn =&gt; btn.classList.remove('active'));    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // Day/Night Keyframe Interpolation &amp; Sky Update    // ------------------------------------------------------------------    function updateAtmosphere(mins) {      let k1 = DAY_KEYFRAMES[0], k2 = DAY_KEYFRAMES[1];      for (let i = 0; i &lt; DAY_KEYFRAMES.length - 1; i++) {        if (mins &gt;= DAY_KEYFRAMES[i].min &amp;&amp; mins &lt;= DAY_KEYFRAMES[i + 1].min) {          k1 = DAY_KEYFRAMES[i];          k2 = DAY_KEYFRAMES[i + 1];          break;        }      }</span></p>
-<p class="p2"><span class="s2">const factor = (mins - k1.min) / (k2.min - k1.min || 1);</span></p>
-<p class="p2"><span class="s2">// Lerp Sky Colors &amp; Lights      skyUniforms.uTop.value.setStyle(k1.top).lerp(new THREE.Color(k2.top), factor);      skyUniforms.uHorizon.value.setStyle(k1.horiz).lerp(new THREE.Color(k2.horiz), factor);            const sunC = new THREE.Color(k1.sunC).lerp(new THREE.Color(k2.sunC), factor);      sunLight.color.copy(sunC);      sunLight.intensity = THREE.MathUtils.lerp(k1.sunI, k2.sunI, factor);</span></p>
-<p class="p2"><span class="s2">hemiLight.color.setStyle(k1.hemiS).lerp(new THREE.Color(k2.hemiS), factor);      hemiLight.groundColor.setStyle(k1.hemiG).lerp(new THREE.Color(k2.hemiG), factor);      hemiLight.intensity = THREE.MathUtils.lerp(k1.hemiI, k2.hemiI, factor);</span></p>
-<p class="p2"><span class="s2">const nightVal = THREE.MathUtils.lerp(k1.night, k2.night, factor);      skyUniforms.uNight.value = nightVal;</span></p>
-<p class="p2"><span class="s2">waterUniforms.uWaterColor.value.setStyle(k1.water).lerp(new THREE.Color(k2.water), factor);      scene.fog.color.copy(skyUniforms.uHorizon.value);</span></p>
-<p class="p2"><span class="s2">// Sun Orbit Math      const t = Math.max(0, Math.min(1, (mins - 360) / 720));      const az = Math.PI * (0.15 + 0.7 * t);      const el = 0.35 + Math.sin(t * Math.PI) * 0.75;      const dir = new THREE.Vector3(Math.cos(az) * Math.cos(el), Math.sin(el), 0.55 * Math.cos(az) + 0.35).normalize();</span></p>
-<p class="p2"><span class="s2">sunLight.position.copy(dir).multiplyScalar(40);      skyUniforms.uSunDir.value.copy(dir);    }</span></p>
-<p class="p2"><span class="s2">// ------------------------------------------------------------------    // 9. Main Animation Loop    // ------------------------------------------------------------------    function animate(time) {      const dt = 0.016;</span></p>
-<p class="p2"><span class="s2">// 1. Advance Time (144s per day cycle)      currentTimeMinutes = (currentTimeMinutes + dt * 10) % 1440;      updateAtmosphere(currentTimeMinutes);</span></p>
-<p class="p2"><span class="s2">// 2. Camera Flying Interpolation      if (isAnimatingCam) {        const elapsed = performance.now() - camAnimStartTime;        const progress = Math.min(elapsed / 800, 1);        const easeProgress = progress &lt; 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;</span></p>
-<p class="p2"><span class="s2">camera.position.lerpVectors(camStartPos, camTargetPos, easeProgress);        controls.target.lerpVectors(camStartLook, camTargetLook, easeProgress);</span></p>
-<p class="p2"><span class="s2">if (progress &gt;= 1) isAnimatingCam = false;      }</span></p>
-<p class="p2"><span class="s2">controls.update();</span></p>
-<p class="p2"><span class="s2">// 3. Update Dynamic Walkers      walkers.forEach(w =&gt; {        w.progress = (w.progress + dt * w.speed * 0.1) % 1;        const pt = w.path.getPoint(w.progress);        w.group.position.copy(pt);      });</span></p>
-<p class="p2"><span class="s2">// 4. Flow Shader Animation      flowTubes.forEach(ft =&gt; {        ft.mat.uniforms.uTime.value = time * 0.001;      });</span></p>
-<p class="p2"><span class="s2">waterUniforms.uTime.value = time * 0.001;</span></p>
-<p class="p2"><span class="s2">// Render Scene      renderer.render(scene, camera);      cssRenderer.render(scene, camera);    }</span></p>
-<p class="p2"><span class="s2">function onWindowResize() {      camera.aspect = window.innerWidth / window.innerHeight;      camera.updateProjectionMatrix();      renderer.setSize(window.innerWidth, window.innerHeight);      cssRenderer.setSize(window.innerWidth, window.innerHeight);    }  &lt;/script&gt;&lt;/body&gt;&lt;/html&gt;</span></p>
+
+  <!-- Loading Screen -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text" data-en="Assembling Policy City...">正在組合政策城市...</div>
+    <div id="error-box"></div>
+  </div>
+
+  <!-- WebGL Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Interactive UI Overlay Layer -->
+  <div class="ui-layer">
+    
+    <!-- Top Left Title Brand Card -->
+    <div class="brand-card glass-card interactive">
+      <h1>🏛️ 示範市 <span style="font-size:0.9rem; font-weight:normal; color:#666;">| 政策島</span></h1>
+      <div class="subtitle">HEART POLICY ISLAND v1.0</div>
+    </div>
+
+    <!-- Top Tools -->
+    <div class="top-tools interactive">
+      <button class="icon-btn" id="btn-reset-cam" title="全景視角">🏠</button>
+      <button class="icon-btn" id="btn-toggle-guide" title="操作說明">?</button>
+    </div>
+
+    <!-- Live Event Log Window -->
+    <div id="live-log" class="glass-card interactive">
+      <div class="log-header"><div class="live-dot"></div><span data-en="CITY LOG">城市動態日誌</span></div>
+      <div class="log-body" id="log-list"></div>
+    </div>
+
+    <!-- Left Detail Drawer Card -->
+    <div id="info-card" class="glass-card interactive">
+      <div class="card-header">
+        <button class="card-close" id="btn-close-info">×</button>
+        <h2 id="card-title" style="font-size:1.2rem; font-weight:800;">主題卡片</h2>
+        <div id="card-subtitle" style="font-size:0.8rem; color:#8a7a68; margin-top:2px;">概覽說明</div>
+      </div>
+      <div class="card-body" id="card-content"></div>
+    </div>
+
+    <!-- Right Navigation Sidebar -->
+    <div id="sidebar" class="glass-card interactive">
+      <div class="tab-nav">
+        <button class="tab-btn active" id="tab-themes" data-en="Themes">政策主題</button>
+        <button class="tab-btn" id="tab-flows" data-en="Flows">協作網絡</button>
+      </div>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="搜尋政策、關鍵字..." data-en-ph="Search policies...">
+      </div>
+      <div class="sidebar-content" id="sidebar-list"></div>
+    </div>
+
+    <!-- Bottom HUD Controls -->
+    <div id="hud-toolbar" class="interactive">
+      <button class="hud-btn" id="btn-time-6">🌅<span>06:00</span></button>
+      <button class="hud-btn active" id="btn-time-12">☀️<span>12:00</span></button>
+      <button class="hud-btn" id="btn-time-18">🌆<span>18:00</span></button>
+      <button class="hud-btn" id="btn-time-21">🌙<span>21:00</span></button>
+      <div style="width:1px; background:rgba(0,0,0,0.1); margin:0 4px;"></div>
+      <button class="hud-btn" id="btn-toggle-flows">🔀<span data-en="Flows">協作線</span></button>
+      <button class="hud-btn" id="btn-toggle-bird">🦅<span data-en="Birdview">鳥瞰</span></button>
+    </div>
+
+  </div>
+
+  <!-- Guide / Onboarding Modal -->
+  <div id="guide-modal" style="display:none;">
+    <div class="guide-content">
+      <h2 style="color:var(--color-primary); margin-bottom:10px;">歡迎來到示範市政策島！</h2>
+      <p style="font-size:0.9rem; color:#666;">這是一座由 3D 微縮黏土模型拼成的動態政策城市，展示跨局處政策與市民協作流程。</p>
+      <div class="guide-step"><b>1. 旋轉與探索：</b> 按住滑鼠左鍵拖曳可旋轉視角，滾輪放大縮小。</div>
+      <div class="guide-step"><b>2. 點擊建築：</b> 點擊島上的建築或右側選單，鏡頭會飛近並顯示詳細政策事實。</div>
+      <div class="guide-step"><b>3. 時間與動態：</b> 下方切換日夜時段，觀察動態小人與專案物資在島嶼間的傳輸。</div>
+      <button class="guide-btn" id="btn-close-guide">開始探索城市</button>
+    </div>
+  </div>
+
+  <!-- Main Logic ES Module Application -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+    import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+    import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+    import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
+
+    // ------------------------------------------------------------------
+    // Seeded Random Helper (mulberry32)
+    // ------------------------------------------------------------------
+    let seed = 123456789;
+    function random() {
+      let t = seed += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+
+    // ------------------------------------------------------------------
+    // 0. Complete Central DATA Schema (12 Islands, Items, Flows, DayCycle)
+    // ------------------------------------------------------------------
+    const DATA = {
+      cityName: "示範市",
+      islands: [
+        { id: "t01", q: 0, r: 0, name: "交通暢行", icon: "🚌", color: "#db6a41" },
+        { id: "t02", q: 1, r: -1, name: "托育育兒", icon: "👶", color: "#f2b5c6" },
+        { id: "t03", q: 1, r: 0, name: "智慧教育", icon: "📚", color: "#58a6a6" },
+        { id: "t04", q: 0, r: 1, name: "健康長照", icon: "🏥", color: "#6f7fb5" },
+        { id: "t05", q: -1, r: 1, name: "全民運動", icon: "⚽", color: "#71806a" },
+        { id: "t06", q: -1, r: 0, name: "都市綠地", icon: "🌳", color: "#8db86f" },
+        { id: "t07", q: 0, r: -1, name: "文化薈萃", icon: "🎨", color: "#b48560" },
+        { id: "t08", q: 2, r: -1, name: "青年創業", icon: "🚀", color: "#3e7c8c" },
+        { id: "t09", q: 1, r: 1, name: "數位治理", icon: "💻", color: "#58a6a6" },
+        { id: "t10", q: -2, r: 1, name: "韌性安全", icon: "🛡️", color: "#db6a41" },
+        { id: "t11", q: -1, r: 2, name: "環保永續", icon: "♻️", color: "#71806a" },
+        { id: "t12", q: 2, r: -2, name: "觀光休閒", icon: "🧳", color: "#fcea8b" }
+      ],
+      items: [
+        // 交通
+        { id: "i01", islandId: "t01", name: "捷運環狀路網擴建", desc: "完成三期環狀捷運工程，大幅縮短跨區通勤時間。", facts: ["每日運量提升 45%", "新增 18 個智慧站點", "減碳年達 12,000 噸"], timeline: "2–3 年", model: "busStop" },
+        { id: "i02", islandId: "t01", name: "共享自行車 3.0", desc: "全面換裝智慧電力輔助自行車與無障礙站點。", facts: ["站點密度提升 60%", "累積騎乘破千萬次", "故障率降低 30%"], timeline: "第 1 年", model: "clinic" },
+        { id: "i03", islandId: "t01", name: "綠色幹道動態號誌", desc: "AI 偵測車流動態調節紅綠燈，提升幹道順暢度。", facts: ["尖峰等待時間 -22%", "降低廢氣排放 15%"], timeline: "第 1 年", model: "hall" },
+
+        // 托育
+        { id: "i04", islandId: "t02", name: "公立托育家園倍增", desc: "活用閒置公有空間設置小型社區化托育中心。", facts: ["增加 1,200 名收托額", "師生比優化至 1:4"], timeline: "2–3 年", model: "house" },
+        { id: "i05", islandId: "t02", name: "夜間與緊急臨時托育", desc: "提供輪班家庭與突發狀況之彈性安全托育服務。", facts: ["覆蓋率達 100% 行政區", "申辦滿意度 96%"], timeline: "第 1 年", model: "clinic" },
+
+        // 教育
+        { id: "i06", islandId: "t03", name: "生生有平板學習計畫", desc: "推動互動式數位教材與程式教育全校涵蓋。", facts: ["發放 45,000 台載具", "數位學習時數 +80%"], timeline: "第 1 年", model: "school" },
+        { id: "i07", islandId: "t03", name: "雙語教育基石專案", desc: "引進外籍師資與國際姊妹校線上沉浸式交流。", facts: ["雙語示範學校達 50 所", "教師培訓合格率 90%"], timeline: "4 年", model: "monument" },
+
+        // 長照
+        { id: "i08", islandId: "t04", name: "銀髮日照綜合園區", desc: "結合復健、社交與營養餐飲的一站式長照基地。", facts: ["服務量能 +300%", "照顧者壓力指數 -40%"], timeline: "2–3 年", model: "clinic" },
+        { id: "i09", islandId: "t04", name: "家庭照顧者喘息服務", desc: "提供到宅關懷與短期替代照顧支援服務。", facts: ["年服務破 2 萬人次", "滿意度 98%"], timeline: "第 1 年", model: "house" },
+
+        // 運動
+        { id: "i10", islandId: "t05", name: "全齡多功能運動中心", desc: "配備溫水泳池、體適能中心與室內球場。", facts: ["月均入場 8 萬人次", "銀髮課程免費率 100%"], timeline: "2–3 年", model: "stadium" },
+        { id: "i11", islandId: "t05", name: "河濱極限與滑板公園", desc: "為青年建立國際標準專業滑板與極限運動場。", facts: ["舉辦國際賽事 3 場", "青年使用滿意度高"], timeline: "第 1 年", model: "stage" },
+
+        // 綠地
+        { id: "i12", islandId: "t06", name: "都市微森林生態公園", desc: "以物種多樣性為核心打造的城市綠洲吸碳島。", facts: ["新增綠地 25 公頃", "降低熱島效應 1.8°C"], timeline: "4 年", model: "farm" },
+        { id: "i13", islandId: "t06", name: "共融式兒童遊戲場", desc: "無障礙設計讓所有孩童皆能平等享受遊樂樂趣。", facts: ["改建 35 座公園", "榮獲國際設計獎"], timeline: "第 1 年", model: "stage" },
+
+        // 其他主題細項
+        { id: "i14", islandId: "t07", name: "市立美術館二館", desc: "展現現代藝術與當代數位互動裝置展演。", facts: ["年參觀人次預估 150 萬", "國際特展年辦 4 場"], timeline: "4 年", model: "monument" },
+        { id: "i15", islandId: "t08", name: "青創孵化基地", desc: "提供免費辦公空間、法律諮詢與創投媒合。", facts: ["成功輔導 120 家團隊", "籌資總額破 3 億"], timeline: "第 1 年", model: "hall" },
+        { id: "i16", islandId: "t09", name: "市民一碼通 App", desc: "整合圖書館、公共運具與規費繳納之數位身分。", facts: ["下載量突破 80 萬", "臨櫃等候時間 -50%"], timeline: "第 1 年", model: "monument" },
+        { id: "i17", islandId: "t10", name: "智慧防洪滯洪池", desc: "結合物聯網感測之自動化防洪排澇應變系統。", facts: ["容量高達 50 萬立方米", "減少積水風險 90%"], timeline: "2–3 年", model: "stadium" },
+        { id: "i18", islandId: "t11", name: "資源循環再造中心", desc: "廚餘轉化有機肥與廚餘發電示範場域。", facts: ["廚餘回收率提升至 75%", "年發電 200 萬度"], timeline: "2–3 年", model: "farm" },
+        { id: "i19", islandId: "t12", name: "舊城夜間漫遊光廊", desc: "運用藝術光雕重塑歷史街區夜間觀光風貌。", facts: ["帶動夜間經濟 +35%", "遊客停留時間增加 2hr"], timeline: "第 1 年", model: "stage" }
+      ],
+      flows: [
+        { id: "f01", from: "t02", to: "t03", item: "幼幼圖書與繪本", evidence: "official", role: "學童與家長" },
+        { id: "f02", from: "t01", to: "t05", item: "共享運動器材", evidence: "thematic", role: "通勤族" },
+        { id: "f03", from: "t04", to: "t06", item: "園藝復健藥箱", evidence: "official", role: "長者與志工" },
+        { id: "f04", from: "t08", to: "t09", item: "數據創新提案", evidence: "pending", role: "青創業者" },
+        { id: "f05", from: "t06", to: "t11", item: "堆肥與樹苗", evidence: "official", role: "養護工人" },
+        { id: "f06", from: "t07", to: "t12", item: "文創週邊展品", evidence: "thematic", role: "導覽員" }
+      ],
+      dayCycle: [
+        { hour: 6, label: "清晨", activeItems: ["i02", "i12"] },
+        { hour: 12, label: "白天", activeItems: ["i01", "i06", "i08", "i10", "i15"] },
+        { hour: 18, label: "黃昏", activeItems: ["i04", "i05", "i11", "i19"] },
+        { hour: 21, label: "夜晚", activeItems: ["i03", "i16", "i17"] }
+      ]
+    };
+
+    // Global Keyframe Interpolation Data for Sky and Atmosphere
+    const DAY_KEYFRAMES = [
+      { min: 0, top: "#1e2c58", horiz: "#3f4f80", sunC: "#b4c2ff", sunI: 1.15, hemiS: "#94a2d8", hemiG: "#64566a", hemiI: 1.85, night: 1, water: "#5a88b2" },
+      { min: 300, top: "#26365f", horiz: "#4c5688", sunC: "#b8c4ff", sunI: 1.0, hemiS: "#96a4da", hemiG: "#66586c", hemiI: 1.85, night: 1, water: "#5c8ab4" },
+      { min: 360, top: "#7f8fc4", horiz: "#f6c3a6", sunC: "#ffb48a", sunI: 1.3, hemiS: "#f3c6b5", hemiG: "#6b5a5a", hemiI: 1.1, night: 0.55, water: "#8fb7c4" },
+      { min: 450, top: "#a9d1ea", horiz: "#fbe6d3", sunC: "#ffe2c4", sunI: 2.4, hemiS: "#eaf2f6", hemiG: "#8a7a68", hemiI: 1.25, night: 0, water: "#9fcfd6" },
+      { min: 720, top: "#9fd0ec", horiz: "#f4eee3", sunC: "#fff1de", sunI: 2.9, hemiS: "#eef6fa", hemiG: "#8f8270", hemiI: 1.35, night: 0, water: "#a9d8db" },
+      { min: 960, top: "#a6cfe6", horiz: "#f8e7d2", sunC: "#ffe3c0", sunI: 2.5, hemiS: "#f1efe8", hemiG: "#8a7a66", hemiI: 1.25, night: 0, water: "#9fcbd2" },
+      { min: 1065, top: "#8b8fc4", horiz: "#f7b98f", sunC: "#ff9f6a", sunI: 1.8, hemiS: "#f6d2bc", hemiG: "#7d6660", hemiI: 1.2, night: 0.3, water: "#93a9bd" },
+      { min: 1140, top: "#5a5e9e", horiz: "#d99aa6", sunC: "#ff9a7a", sunI: 1.3, hemiS: "#c0b2e0", hemiG: "#655868", hemiI: 1.35, night: 0.75, water: "#6a7cab" },
+      { min: 1260, top: "#22325f", horiz: "#445488", sunC: "#c0ccff", sunI: 1.2, hemiS: "#98a8dc", hemiG: "#685a6e", hemiI: 1.9, night: 1, water: "#5a88b2" },
+      { min: 1440, top: "#1e2c58", horiz: "#3f4f80", sunC: "#b4c2ff", sunI: 1.15, hemiS: "#94a2d8", hemiG: "#64566a", hemiI: 1.85, night: 1, water: "#5a88b2" }
+    ];
+
+    // ------------------------------------------------------------------
+    // World Constants
+    // ------------------------------------------------------------------
+    const R = 2.02;
+    const SPACING = 2.28;
+    const TOP = 0.65;
+    const WATER_Y = -0.18;
+
+    // ------------------------------------------------------------------
+    // Application State & Main WebGL Setup
+    // ------------------------------------------------------------------
+    let scene, camera, renderer, cssRenderer, controls, simplex;
+    let skyMesh, skyUniforms, waterMesh, waterUniforms, sunLight, hemiLight;
+    let islandMap = new Map();
+    let itemMeshMap = new Map();
+    let kitInstances = new Map(); // Dynamic/Static Instanced Mesh Kit
+    let walkers = [];
+    let flowTubes = [];
+    let currentTimeMinutes = 600; // Default 10:00 AM
+    let isBirdView = false;
+    let isFlowVisible = false;
+    let selectedIsland = null;
+    let selectedItem = null;
+    let isAnimatingCam = false;
+    let camAnimStartTime = 0;
+    let camStartPos = new THREE.Vector3(), camTargetPos = new THREE.Vector3();
+    let camStartLook = new THREE.Vector3(), camTargetLook = new THREE.Vector3();
+
+    // Init Logic with Robust Exception Handling
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        initApp();
+      } catch (err) {
+        console.error("Initialization Failed:", err);
+        const errBox = document.getElementById('error-box');
+        errBox.style.display = 'block';
+        errBox.innerText = '系統初始化失敗：' + err.message + '。請確保瀏覽器支援 WebGL2。';
+        document.querySelector('.spinner').style.display = 'none';
+      }
+    });
+
+    function initApp() {
+      // 1. Core Renderer Setup
+      const container = document.getElementById('canvas-container');
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      container.appendChild(renderer.domElement);
+
+      // CSS 2D Label Renderer
+      cssRenderer = new CSS2DRenderer();
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.domElement.style.position = 'absolute';
+      cssRenderer.domElement.style.top = '0px';
+      cssRenderer.domElement.style.pointerEvents = 'none';
+      container.appendChild(cssRenderer.domElement);
+
+      // Scene & Camera
+      scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0xf4eee3, 42, 150);
+
+      camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 0.3, 320);
+      camera.position.set(20, 28, 35);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.07;
+      controls.enablePan = false;
+      controls.minPolarAngle = THREE.MathUtils.degToRad(25);
+      controls.maxPolarAngle = THREE.MathUtils.degToRad(70);
+      controls.minDistance = 3;
+      controls.maxDistance = 70;
+      controls.target.set(0, 0, 0);
+
+      simplex = new SimplexNoise(random);
+
+      // 2. Build World Infrastructure
+      buildSkyAndLighting();
+      buildWater();
+      buildTerrainAndDistantMountains();
+      buildCityIslands();
+      buildKitAndBuildings();
+      buildWalkersAndFlows();
+
+      // 3. Setup UI & Event Listeners
+      setupUI();
+      setupInteractions();
+
+      // Fade out Loading Screen
+      setTimeout(() => {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 600);
+      }, 500);
+
+      // Check LocalStorage for First Visit Guide
+      try {
+        if (!localStorage.getItem('policy_island_visited')) {
+          document.getElementById('guide-modal').style.display = 'flex';
+        }
+      } catch (e) { /* Ignore privacy storage block */ }
+
+      // Animation Loop
+      window.addEventListener('resize', onWindowResize);
+      renderer.setAnimationLoop(animate);
+    }
+
+    // ------------------------------------------------------------------
+    // Hexagon Coordinate Helper (Axial -> World)
+    // ------------------------------------------------------------------
+    function axialToWorld(q, r) {
+      const x = Math.sqrt(3) * SPACING * (q + r / 2);
+      const z = 1.5 * SPACING * r;
+      return { x, z };
+    }
+
+    // Procedural Ground Canvas Texture
+    function createGroundCanvasTexture(type) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256; canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = "#e8dac8";
+      ctx.fillRect(0, 0, 256, 256);
+
+      if (type === 0) { // Brick Pattern
+        ctx.strokeStyle = "rgba(180, 150, 120, 0.25)";
+        ctx.lineWidth = 4;
+        for (let i = 0; i < 256; i += 32) {
+          ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+          for (let j = 0; j < 256; j += 32) {
+            ctx.beginPath(); ctx.moveTo(j + (i % 64 ? 16 : 0), i); ctx.lineTo(j + (i % 64 ? 16 : 0), i + 32); ctx.stroke();
+          }
+        }
+      } else if (type === 1) { // Dots
+        ctx.fillStyle = "rgba(160, 130, 100, 0.15)";
+        for (let x = 16; x < 256; x += 32) {
+          for (let y = 16; y < 256; y += 32) {
+            ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+      } else { // Stripes
+        ctx.strokeStyle = "rgba(170, 140, 110, 0.2)";
+        ctx.lineWidth = 6;
+        for (let i = -256; i < 512; i += 24) {
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 256, 256); ctx.stroke();
+        }
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    // ------------------------------------------------------------------
+    // Sky Shader, Lighting & Atmosphere
+    // ------------------------------------------------------------------
+    function buildSkyAndLighting() {
+      // Hemisphere & Directional Sun Light
+      hemiLight = new THREE.HemisphereLight(0xeef6fa, 0x8f8270, 1.3);
+      scene.add(hemiLight);
+
+      sunLight = new THREE.DirectionalLight(0xfff1de, 2.8);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 1;
+      sunLight.shadow.camera.far = 90;
+      sunLight.shadow.camera.left = -20;
+      sunLight.shadow.camera.right = 20;
+      sunLight.shadow.camera.top = 22;
+      sunLight.shadow.camera.bottom = -22;
+      sunLight.shadow.bias = -0.0006;
+      sunLight.shadow.normalBias = 0.045;
+      sunLight.shadow.radius = 3;
+      scene.add(sunLight);
+
+      const fillLight = new THREE.DirectionalLight(0xbfd6ff, 0.35);
+      fillLight.position.set(-20, 15, -20);
+      scene.add(fillLight);
+
+      // Sky Atmosphere Sphere Shader
+      const skyGeo = new THREE.SphereGeometry(170, 32, 15);
+      skyUniforms = {
+        uTop: { value: new THREE.Color() },
+        uHorizon: { value: new THREE.Color() },
+        uSunDir: { value: new THREE.Vector3() },
+        uNight: { value: 0 }
+      };
+
+      const skyMat = new THREE.ShaderMaterial({
+        uniforms: skyUniforms,
+        side: THREE.BackSide,
+        depthWrite: false,
+        vertexShader: `
+          varying vec3 vWorldPosition;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * viewMatrix * worldPosition;
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uTop;
+          uniform vec3 uHorizon;
+          uniform vec3 uSunDir;
+          uniform float uNight;
+          varying vec3 vWorldPosition;
+
+          float hash(vec3 p) {
+            p  = fract(p * 0.3183099 + .1);
+            p *= 17.0;
+            return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+          }
+
+          void main() {
+            vec3 dir = normalize(vWorldPosition);
+            float h = smoothstep(-0.02, 0.55, dir.y);
+            vec3 col = mix(uHorizon, uTop, h);
+
+            // Sun Glow
+            float sunDot = max(0.0, dot(dir, uSunDir));
+            col += vec3(1.0, 0.8, 0.5) * pow(sunDot, 18.0) * 0.35;
+
+            // Night Stars
+            if (uNight > 0.1) {
+              vec3 starP = floor(dir * 180.0);
+              if (hash(starP) > 0.9965 && dir.y > 0.1) {
+                col += vec3(0.9, 0.95, 1.0) * uNight * (0.5 + 0.5 * sin(dir.x * 100.0));
+              }
+            }
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `
+      });
+      skyMesh = new THREE.Mesh(skyGeo, skyMat);
+      scene.add(skyMesh);
+    }
+
+    // Dynamic Shader Water Plane
+    function buildWater() {
+      const waterGeo = new THREE.CircleGeometry(160, 64);
+      waterGeo.rotateX(-Math.PI / 2);
+
+      waterUniforms = {
+        uTime: { value: 0 },
+        uWaterColor: { value: new THREE.Color("#a4d4da") },
+        fogColor: { value: scene.fog.color },
+        fogNear: { value: scene.fog.near },
+        fogFar: { value: scene.fog.far }
+      };
+
+      const waterMat = new THREE.ShaderMaterial({
+        uniforms: waterUniforms,
+        vertexShader: `
+          varying vec3 vWorldPos;
+          void main() {
+            vec4 wp = modelMatrix * vec4(position, 1.0);
+            vWorldPos = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }
+        `,
+        fragmentShader: `
+          uniform float uTime;
+          uniform vec3 uWaterColor;
+          uniform vec3 fogColor;
+          uniform float fogNear;
+          uniform float fogFar;
+          varying vec3 vWorldPos;
+
+          void main() {
+            float wave = sin(vWorldPos.x * 0.4 + uTime * 1.2) * cos(vWorldPos.z * 0.4 + uTime * 1.5) * 0.5 + 0.5;
+            vec3 col = mix(uWaterColor, uWaterColor * 0.8, wave);
+            
+            // Distance fog blend
+            float dist = length(vWorldPos.xz);
+            float fogFactor = smoothstep(fogNear, fogFar, dist);
+            col = mix(col, fogColor, fogFactor);
+
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `
+      });
+
+      waterMesh = new THREE.Mesh(waterGeo, waterMat);
+      waterMesh.position.y = WATER_Y;
+      waterMesh.receiveShadow = true;
+      scene.add(waterMesh);
+    }
+
+    // Background Basin Terrain & Distant Mountains
+    function buildTerrainAndDistantMountains() {
+      const terrainGeo = new THREE.PlaneGeometry(170, 170, 120, 120);
+      terrainGeo.rotateX(-Math.PI / 2);
+      const pos = terrainGeo.attributes.position;
+      const colors = [];
+
+      const cRiver = new THREE.Color("#8fb3ad");
+      const cSand  = new THREE.Color("#d9c9a3");
+      const cFarm  = new THREE.Color("#aec493");
+      const cGrass = new THREE.Color("#a3b986");
+      const cForest= new THREE.Color("#6f8a62");
+      const cRock  = new THREE.Color("#b2a38d");
+
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        const dist = Math.sqrt(x * x + z * z);
+        
+        // Ring Mountains Ring Formation
+        let h = 0;
+        if (dist > 25) {
+          const ringFactor = THREE.MathUtils.smoothstep(dist, 25, 55);
+          const n = simplex.noise2D(x * 0.03, z * 0.03);
+          h = ringFactor * (12 + n * 18);
+          if (z > 20) h *= 0.3; // Flatten front camera view
+        }
+
+        pos.setY(i, h);
+
+        // Vertex Color Grading based on elevation
+        let col = cGrass;
+        if (h < 0.2) col = cRiver;
+        else if (h < 1.5) col = cSand;
+        else if (h < 4.0) col = cFarm;
+        else if (h < 12.0) col = cForest;
+        else col = cRock;
+
+        colors.push(col.r, col.g, col.b);
+      }
+
+      terrainGeo.computeVertexNormals();
+      terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const terrainMat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        flatShading: true
+      });
+
+      const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+      terrainMesh.position.y = -0.5;
+      scene.add(terrainMesh);
+    }
+
+    // ------------------------------------------------------------------
+    // 2. City Islands & Bridge Infrastructure
+    // ------------------------------------------------------------------
+    function buildCityIslands() {
+      const tex0 = createGroundCanvasTexture(0);
+      const tex1 = createGroundCanvasTexture(1);
+      const tex2 = createGroundCanvasTexture(2);
+      const textures = [tex0, tex1, tex2];
+
+      const hexShapeGeo = new THREE.CircleGeometry(R - 0.05, 6);
+      hexShapeGeo.rotateZ(Math.PI / 6);
+      hexShapeGeo.rotateX(-Math.PI / 2);
+
+      DATA.islands.forEach((isData, idx) => {
+        const { x, z } = axialToWorld(isData.q, isData.r);
+        const group = new THREE.Group();
+        group.position.set(x, TOP, z);
+
+        // Ground Top Top Plane
+        const groundMat = new THREE.MeshStandardMaterial({
+          map: textures[idx % 3],
+          roughness: 0.92,
+          polygonOffset: true,
+          polygonOffsetFactor: -1
+        });
+        const groundMesh = new THREE.Mesh(hexShapeGeo, groundMat);
+        groundMesh.receiveShadow = true;
+        group.add(groundMesh);
+
+        // Ring Pedestrian Walkway
+        const ringGeo = new THREE.RingGeometry(1.52, 1.8, 6);
+        ringGeo.rotateZ(Math.PI / 6);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshStandardMaterial({ color: 0xd3b89c, roughness: 0.85 });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.y = 0.005;
+        ringMesh.receiveShadow = true;
+        group.add(ringMesh);
+
+        // Island Side Wall Platform
+        const wallGeo = new THREE.CylinderGeometry(R, R * 0.92, TOP - WATER_Y, 6);
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xe4d6c3, roughness: 0.8 });
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.position.y = -(TOP - WATER_Y) / 2;
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        group.add(wallMesh);
+
+        // Outer Foam Ring
+        const foamGeo = new THREE.RingGeometry(R + 0.02, R + 0.22, 6);
+        foamGeo.rotateZ(Math.PI / 6);
+        foamGeo.rotateX(-Math.PI / 2);
+        const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
+        const foamMesh = new THREE.Mesh(foamGeo, foamMat);
+        foamMesh.position.y = WATER_Y - TOP + 0.01;
+        group.add(foamMesh);
+
+        // CSS 2D Label
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'island-label';
+        labelDiv.innerText = `${isData.name}`;
+        labelDiv.addEventListener('click', () => selectIsland(isData.id));
+
+        const cssLabel = new CSS2DObject(labelDiv);
+        cssLabel.position.set(0, 0.3, R * 0.85);
+        group.add(cssLabel);
+
+        scene.add(group);
+        islandMap.set(isData.id, { data: isData, group, worldPos: new THREE.Vector3(x, TOP, z) });
+      });
+
+      // Build Connecting Bridges Between Adjacent Islands
+      DATA.islands.forEach(a => {
+        DATA.islands.forEach(b => {
+          if (a.id < b.id) {
+            const dq = Math.abs(a.q - b.q);
+            const dr = Math.abs(a.r - b.r);
+            const ds = Math.abs((-a.q - a.r) - (-b.q - b.r));
+            if ((dq === 1 && dr === 0) || (dq === 0 && dr === 1) || (dq === 1 && dr === 1 && ds === 0)) {
+              buildBridge(a, b);
+            }
+          }
+        });
+      });
+    }
+
+    function buildBridge(isA, isB) {
+      const posA = axialToWorld(isA.q, isA.r);
+      const posB = axialToWorld(isB.q, isB.r);
+      const start = new THREE.Vector3(posA.x, TOP, posA.z);
+      const end = new THREE.Vector3(posB.x, TOP, posB.z);
+
+      const dist = start.distanceTo(end);
+      const bridgeGroup = new THREE.Group();
+      bridgeGroup.position.copy(start).lerp(end, 0.5);
+      bridgeGroup.lookAt(end);
+
+      const deckGeo = new THREE.BoxGeometry(0.5, 0.08, dist * 0.52);
+      const deckMat = new THREE.MeshStandardMaterial({ color: 0xb48560, roughness: 0.8 });
+      const deckMesh = new THREE.Mesh(deckGeo, deckMat);
+      deckMesh.position.y = 0.02;
+      deckMesh.castShadow = true;
+      bridgeGroup.add(deckMesh);
+
+      scene.add(bridgeGroup);
+    }
+
+    // ------------------------------------------------------------------
+    // 5. Instanced Building Kit Archetypes
+    // ------------------------------------------------------------------
+    function buildKitAndBuildings() {
+      // Create Base Archetype Models for Items
+      DATA.items.forEach((item, index) => {
+        const island = islandMap.get(item.islandId);
+        if (!island) return;
+
+        const itemGroup = new THREE.Group();
+
+        // Calculate Position on Grid inside Island
+        const angle = (index * 2.1) % (Math.PI * 2);
+        const radius = 0.4 + (index % 3) * 0.35;
+        const lx = Math.cos(angle) * radius;
+        const lz = Math.sin(angle) * radius - 0.2;
+
+        itemGroup.position.set(island.worldPos.x + lx, TOP, island.worldPos.z + lz);
+
+        // Construct 3D Clay Style Model by Kind
+        let modelMesh;
+        const baseColor = new THREE.Color(island.data.color);
+
+        switch (item.model) {
+          case 'school':
+            modelMesh = createClayBuilding(0.6, 0.7, 0.5, baseColor, 0x4a6fa5);
+            break;
+          case 'clinic':
+            modelMesh = createClayBuilding(0.5, 0.5, 0.5, new THREE.Color(0xffffff), 0xdb6a41);
+            break;
+          case 'busStop':
+            modelMesh = createBusStopModel();
+            break;
+          case 'stadium':
+            modelMesh = createDomeModel(baseColor);
+            break;
+          case 'stage':
+            modelMesh = createStageModel();
+            break;
+          case 'monument':
+            modelMesh = createMonumentModel();
+            break;
+          default:
+            modelMesh = createClayBuilding(0.45, 0.55, 0.45, baseColor, 0xfcea8b);
+            break;
+        }
+
+        itemGroup.add(modelMesh);
+
+        // Number Pin Indicator
+        const pinDiv = document.createElement('div');
+        pinDiv.className = 'item-pin';
+        pinDiv.innerText = `${(index % 5) + 1}`;
+        pinDiv.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectItem(item.id);
+        });
+
+        const cssPin = new CSS2DObject(pinDiv);
+        cssPin.position.set(0, 0.9, 0);
+        itemGroup.add(cssPin);
+
+        scene.add(itemGroup);
+        itemMeshMap.set(item.id, { data: item, group: itemGroup, mesh: modelMesh, originalColor: baseColor.clone() });
+      });
+    }
+
+    // Helper Clay Building Creators
+    function createClayBuilding(w, h, d, wallColor, roofHex) {
+      const g = new THREE.Group();
+
+      // Main Clay Body Wall
+      const wallGeo = new RoundedBoxGeometry(w, h, d, 2, 0.08);
+      const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.78 });
+      const wall = new THREE.Mesh(wallGeo, wallMat);
+      wall.position.y = h / 2;
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      g.add(wall);
+
+      // Pitch Roof
+      const roofGeo = new THREE.ConeGeometry(Math.max(w, d) * 0.75, 0.35, 4);
+      roofGeo.rotateY(Math.PI / 4);
+      const roofMat = new THREE.MeshStandardMaterial({ color: roofHex, roughness: 0.75 });
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.position.y = h + 0.15;
+      roof.castShadow = true;
+      g.add(roof);
+
+      return g;
+    }
+
+    function createBusStopModel() {
+      const g = new THREE.Group();
+      const benchGeo = new RoundedBoxGeometry(0.4, 0.15, 0.2, 2, 0.02);
+      const benchMat = new THREE.MeshStandardMaterial({ color: 0xb48560, roughness: 0.8 });
+      const bench = new THREE.Mesh(benchGeo, benchMat);
+      bench.position.y = 0.08;
+      g.add(bench);
+
+      const signGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.6);
+      const signMat = new THREE.MeshStandardMaterial({ color: 0x211d1d });
+      const sign = new THREE.Mesh(signGeo, signMat);
+      sign.position.set(0.25, 0.3, 0);
+      g.add(sign);
+
+      return g;
+    }
+
+    function createDomeModel(color) {
+      const g = new THREE.Group();
+      const domeGeo = new THREE.SphereGeometry(0.4, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+      const domeMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7 });
+      const dome = new THREE.Mesh(domeGeo, domeMat);
+      dome.position.y = 0.1;
+      dome.castShadow = true;
+      g.add(dome);
+      return g;
+    }
+
+    function createStageModel() {
+      const g = new THREE.Group();
+      const stageGeo = new THREE.CylinderGeometry(0.5, 0.55, 0.12, 12);
+      const stageMat = new THREE.MeshStandardMaterial({ color: 0xfcea8b, roughness: 0.8 });
+      const stage = new THREE.Mesh(stageGeo, stageMat);
+      stage.position.y = 0.06;
+      g.add(stage);
+      return g;
+    }
+
+    function createMonumentModel() {
+      const g = new THREE.Group();
+      const monGeo = new THREE.BoxGeometry(0.2, 0.8, 0.2);
+      const monMat = new THREE.MeshStandardMaterial({ color: 0x3e7c8c, roughness: 0.6 });
+      const mon = new THREE.Mesh(monGeo, monMat);
+      mon.position.y = 0.4;
+      mon.castShadow = true;
+      g.add(mon);
+      return g;
+    }
+
+    // ------------------------------------------------------------------
+    // 6. Chibi Walkers & Flow Connection Tubes
+    // ------------------------------------------------------------------
+    function buildWalkersAndFlows() {
+      DATA.flows.forEach(flow => {
+        const isFrom = islandMap.get(flow.from);
+        const isTo = islandMap.get(flow.to);
+        if (!isFrom || !isTo) return;
+
+        // Tube Curve Path
+        const pA = isFrom.worldPos.clone().add(new THREE.Vector3(0, 0.1, 0));
+        const pB = isTo.worldPos.clone().add(new THREE.Vector3(0, 0.1, 0));
+        const mid = pA.clone().add(pB).multiplyScalar(0.5).add(new THREE.Vector3(0, 0.8, 0));
+
+        const curve = new THREE.QuadraticBezierCurve3(pA, mid, pB);
+        const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.035, 8, false);
+
+        const flowMat = new THREE.ShaderMaterial({
+          transparent: true,
+          uniforms: {
+            uTime: { value: 0 },
+            uColor: { value: new THREE.Color("#db6a41") },
+            uStyle: { value: flow.evidence === 'official' ? 0 : (flow.evidence === 'thematic' ? 1 : 2) }
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform float uTime;
+            uniform vec3 uColor;
+            uniform int uStyle;
+            varying vec2 vUv;
+
+            void main() {
+              float u = vUv.x * 25.0 - uTime * 3.0;
+              float alpha = 0.82;
+
+              if (uStyle == 1 && fract(u) > 0.6) discard; // Dashed
+              if (uStyle == 2 && fract(u) > 0.3) discard; // Dotted
+
+              gl_FragColor = vec4(uColor, alpha);
+            }
+          `
+        });
+
+        const tubeMesh = new THREE.Mesh(tubeGeo, flowMat);
+        tubeMesh.visible = false; // Hidden by default
+        scene.add(tubeMesh);
+        flowTubes.push({ data: flow, mesh: tubeMesh, mat: flowMat });
+
+        // Add Chibi Walker Character
+        createChibiWalker(curve, flow);
+      });
+    }
+
+    function createChibiWalker(curvePath, flowData) {
+      const walkerGroup = new THREE.Group();
+
+      // Head (Sphere)
+      const headGeo = new THREE.SphereGeometry(0.12, 12, 12);
+      const headMat = new THREE.MeshStandardMaterial({ color: 0xffdfc4, roughness: 0.8 });
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.y = 0.28;
+      walkerGroup.add(head);
+
+      // Body Capsule
+      const bodyGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.16, 8);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xdb6a41, roughness: 0.8 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.12;
+      walkerGroup.add(body);
+
+      scene.add(walkerGroup);
+
+      walkers.push({
+        group: walkerGroup,
+        path: curvePath,
+        progress: random(),
+        speed: 0.08 + random() * 0.04,
+        flow: flowData
+      });
+    }
+
+    // ------------------------------------------------------------------
+    // 8. Interaction System & Camera Controls
+    // ------------------------------------------------------------------
+    function setupInteractions() {
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      let pointerDownPos = { x: 0, y: 0 };
+
+      window.addEventListener('pointerdown', (e) => {
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+      });
+
+      window.addEventListener('pointerup', (e) => {
+        const dx = Math.abs(e.clientX - pointerDownPos.x);
+        const dy = Math.abs(e.clientY - pointerDownPos.y);
+        if (dx > 6 || dy > 6) return; // Ignore drag clicks
+
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        // Raycast against Item Buildings
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        if (intersects.length > 0) {
+          let obj = intersects[0].object;
+          while (obj.parent && obj.parent !== scene) {
+            obj = obj.parent;
+          }
+          
+          // Check if item building was clicked
+          for (let [id, itemObj] of itemMeshMap.entries()) {
+            if (itemObj.group === obj) {
+              selectItem(id);
+              return;
+            }
+          }
+        }
+      });
+
+      // Camera Reset Button
+      document.getElementById('btn-reset-cam').addEventListener('click', resetCamera);
+    }
+
+    function selectIsland(id) {
+      const island = islandMap.get(id);
+      if (!island) return;
+
+      selectedIsland = id;
+      selectedItem = null;
+
+      // Highlight Selected Label
+      document.querySelectorAll('.island-label').forEach(lbl => lbl.classList.remove('selected'));
+
+      // Smooth Fly Camera
+      flyCameraTo(island.worldPos.clone().add(new THREE.Vector3(2.75, 5.3, 6.2)), island.worldPos);
+
+      // Open Info Card
+      showInfoCard('island', island.data);
+      addLiveLog(`聚焦政策主題：${island.data.name}`);
+    }
+
+    function selectItem(id) {
+      const itemObj = itemMeshMap.get(id);
+      if (!itemObj) return;
+
+      selectedItem = id;
+      const targetPos = itemObj.group.position.clone();
+
+      flyCameraTo(targetPos.clone().add(new THREE.Vector3(1.6, 2.5, 3.2)), targetPos);
+
+      showInfoCard('item', itemObj.data);
+      addLiveLog(`查看細項政策：${itemObj.data.name}`);
+    }
+
+    function flyCameraTo(targetCamPos, targetLookAt) {
+      camStartPos.copy(camera.position);
+      camStartLook.copy(controls.target);
+
+      camTargetPos.copy(targetCamPos);
+      camTargetLook.copy(targetLookAt);
+
+      isAnimatingCam = true;
+      camAnimStartTime = performance.now();
+    }
+
+    function resetCamera() {
+      isBirdView = false;
+      flyCameraTo(new THREE.Vector3(20, 28, 35), new THREE.Vector3(0, 0, 0));
+      document.getElementById('info-card').classList.remove('active');
+    }
+
+    // ------------------------------------------------------------------
+    // UI Cards & Sidebar Setup
+    // ------------------------------------------------------------------
+    function setupUI() {
+      const sidebarList = document.getElementById('sidebar-list');
+
+      // Populate Sidebar Themes
+      DATA.islands.forEach(is => {
+        const items = DATA.items.filter(it => it.islandId === is.id);
+
+        const details = document.createElement('details');
+        details.className = 'theme-group';
+        details.innerHTML = `
+          <summary>
+            <span>${is.icon} ${is.name}</span>
+            <span class="badge-num">${items.length}</span>
+          </summary>
+          <div class="item-list">
+            ${items.map((it, idx) => `
+              <div class="item-row" data-id="${it.id}">
+                <span class="badge-num" style="background:#8a7a68">${idx + 1}</span>
+                <span>${it.name}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        sidebarList.appendChild(details);
+      });
+
+      // Sidebar Event Delegation
+      sidebarList.addEventListener('click', (e) => {
+        const row = e.target.closest('.item-row');
+        if (row) {
+          selectItem(row.dataset.id);
+        }
+      });
+
+      // HUD Button Listeners
+      document.getElementById('btn-time-6').addEventListener('click', () => setTime(360));
+      document.getElementById('btn-time-12').addEventListener('click', () => setTime(720));
+      document.getElementById('btn-time-18').addEventListener('click', () => setTime(1080));
+      document.getElementById('btn-time-21').addEventListener('click', () => setTime(1260));
+
+      document.getElementById('btn-toggle-flows').addEventListener('click', (e) => {
+        isFlowVisible = !isFlowVisible;
+        e.currentTarget.classList.toggle('active', isFlowVisible);
+        flowTubes.forEach(ft => ft.mesh.visible = isFlowVisible);
+      });
+
+      document.getElementById('btn-toggle-bird').addEventListener('click', () => {
+        isBirdView = !isBirdView;
+        if (isBirdView) {
+          flyCameraTo(new THREE.Vector3(0.01, 42, 6), new THREE.Vector3(0, 0, 0));
+        } else {
+          resetCamera();
+        }
+      });
+
+      document.getElementById('btn-close-info').addEventListener('click', () => {
+        document.getElementById('info-card').classList.remove('active');
+      });
+
+      document.getElementById('btn-close-guide').addEventListener('click', () => {
+        document.getElementById('guide-modal').style.display = 'none';
+        try { localStorage.setItem('policy_island_visited', 'true'); } catch (e) {}
+      });
+
+      document.getElementById('btn-toggle-guide').addEventListener('click', () => {
+        document.getElementById('guide-modal').style.display = 'flex';
+      });
+    }
+
+    function showInfoCard(type, data) {
+      const card = document.getElementById('info-card');
+      const title = document.getElementById('card-title');
+      const subtitle = document.getElementById('card-subtitle');
+      const content = document.getElementById('card-content');
+
+      card.classList.add('active');
+
+      if (type === 'island') {
+        title.innerText = `${data.icon} ${data.name}`;
+        subtitle.innerText = "政策主題概覽";
+        const items = DATA.items.filter(it => it.islandId === data.id);
+
+        content.innerHTML = `
+          <p style="font-size:0.9rem; color:#555; margin-bottom:15px;">本島嶼包含 ${items.length} 項核心重點施政計畫，按數字標籤可展開細節。</p>
+          <h4 style="font-size:0.85rem; font-weight:800; margin-bottom:8px;">包含政策細項：</h4>
+          ${items.map((it, idx) => `
+            <div style="background:#fff; padding:10px 12px; border-radius:10px; margin-bottom:6px; font-size:0.85rem; border:1px solid rgba(0,0,0,0.04);">
+              <b>${idx + 1}. ${it.name}</b>
+              <div style="font-size:0.75rem; color:#8a7a68; margin-top:2px;">${it.desc}</div>
+            </div>
+          `).join('')}
+        `;
+      } else if (type === 'item') {
+        title.innerText = data.name;
+        subtitle.innerText = `預計時程：${data.timeline}`;
+
+        content.innerHTML = `
+          <p style="font-size:0.9rem; line-height:1.4; color:#444; margin-bottom:12px;">${data.desc}</p>
+          <div class="metric-grid">
+            ${data.facts.map(f => {
+              const parts = f.match(/([^\d-]*)([\d,%\.\+-]+)(.*)/) || [null, '', f, ''];
+              return `
+                <div class="metric-brick">
+                  <div class="metric-val">${parts[2] || ''}</div>
+                  <div class="metric-lbl">${parts[1] + parts[3]}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+    }
+
+    function addLiveLog(msg) {
+      const logList = document.getElementById('log-list');
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      item.innerText = msg;
+      logList.prepend(item);
+    }
+
+    function setTime(mins) {
+      currentTimeMinutes = mins;
+      document.querySelectorAll('#hud-toolbar .hud-btn').forEach(btn => btn.classList.remove('active'));
+    }
+
+    // ------------------------------------------------------------------
+    // Day/Night Keyframe Interpolation & Sky Update
+    // ------------------------------------------------------------------
+    function updateAtmosphere(mins) {
+      let k1 = DAY_KEYFRAMES[0], k2 = DAY_KEYFRAMES[1];
+      for (let i = 0; i < DAY_KEYFRAMES.length - 1; i++) {
+        if (mins >= DAY_KEYFRAMES[i].min && mins <= DAY_KEYFRAMES[i + 1].min) {
+          k1 = DAY_KEYFRAMES[i];
+          k2 = DAY_KEYFRAMES[i + 1];
+          break;
+        }
+      }
+
+      const factor = (mins - k1.min) / (k2.min - k1.min || 1);
+
+      // Lerp Sky Colors & Lights
+      skyUniforms.uTop.value.setStyle(k1.top).lerp(new THREE.Color(k2.top), factor);
+      skyUniforms.uHorizon.value.setStyle(k1.horiz).lerp(new THREE.Color(k2.horiz), factor);
+      
+      const sunC = new THREE.Color(k1.sunC).lerp(new THREE.Color(k2.sunC), factor);
+      sunLight.color.copy(sunC);
+      sunLight.intensity = THREE.MathUtils.lerp(k1.sunI, k2.sunI, factor);
+
+      hemiLight.color.setStyle(k1.hemiS).lerp(new THREE.Color(k2.hemiS), factor);
+      hemiLight.groundColor.setStyle(k1.hemiG).lerp(new THREE.Color(k2.hemiG), factor);
+      hemiLight.intensity = THREE.MathUtils.lerp(k1.hemiI, k2.hemiI, factor);
+
+      const nightVal = THREE.MathUtils.lerp(k1.night, k2.night, factor);
+      skyUniforms.uNight.value = nightVal;
+
+      waterUniforms.uWaterColor.value.setStyle(k1.water).lerp(new THREE.Color(k2.water), factor);
+      scene.fog.color.copy(skyUniforms.uHorizon.value);
+
+      // Sun Orbit Math
+      const t = Math.max(0, Math.min(1, (mins - 360) / 720));
+      const az = Math.PI * (0.15 + 0.7 * t);
+      const el = 0.35 + Math.sin(t * Math.PI) * 0.75;
+      const dir = new THREE.Vector3(Math.cos(az) * Math.cos(el), Math.sin(el), 0.55 * Math.cos(az) + 0.35).normalize();
+
+      sunLight.position.copy(dir).multiplyScalar(40);
+      skyUniforms.uSunDir.value.copy(dir);
+    }
+
+    // ------------------------------------------------------------------
+    // 9. Main Animation Loop
+    // ------------------------------------------------------------------
+    function animate(time) {
+      const dt = 0.016;
+
+      // 1. Advance Time (144s per day cycle)
+      currentTimeMinutes = (currentTimeMinutes + dt * 10) % 1440;
+      updateAtmosphere(currentTimeMinutes);
+
+      // 2. Camera Flying Interpolation
+      if (isAnimatingCam) {
+        const elapsed = performance.now() - camAnimStartTime;
+        const progress = Math.min(elapsed / 800, 1);
+        const easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+        camera.position.lerpVectors(camStartPos, camTargetPos, easeProgress);
+        controls.target.lerpVectors(camStartLook, camTargetLook, easeProgress);
+
+        if (progress >= 1) isAnimatingCam = false;
+      }
+
+      controls.update();
+
+      // 3. Update Dynamic Walkers
+      walkers.forEach(w => {
+        w.progress = (w.progress + dt * w.speed * 0.1) % 1;
+        const pt = w.path.getPoint(w.progress);
+        w.group.position.copy(pt);
+      });
+
+      // 4. Flow Shader Animation
+      flowTubes.forEach(ft => {
+        ft.mat.uniforms.uTime.value = time * 0.001;
+      });
+
+      waterUniforms.uTime.value = time * 0.001;
+
+      // Render Scene
+      renderer.render(scene, camera);
+      cssRenderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  </script>
 </body>
 </html>
