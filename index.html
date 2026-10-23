@@ -2,239 +2,122 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>未來市政策島 - 3D 互動政策城市</title>
-  
-  <!-- Importmap -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-    }
-  }
-  </script>
-
   <style>
-    :root {
-      --color-primary: #db6a41;
-      --color-ink: #211d1d;
-      --color-cream: #fff8f4;
-      --color-yellow: #fcea8b;
-      --color-bg-glass: rgba(255, 248, 244, 0.88);
-      --font-main: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-main); color: var(--color-ink); background: radial-gradient(circle at center, #fffdf9 0%, #edddcf 100%); }
-
-    #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-    
-    /* Loading Overlay */
-    #loading-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: #edddcf; z-index: 9999; display: flex; flex-direction: column;
-      justify-content: center; align-items: center; transition: opacity 0.6s ease;
-    }
-    .spinner { width: 50px; height: 50px; border: 5px solid rgba(219,106,65,0.2); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #loading-text { margin-top: 20px; font-size: 1.2rem; font-weight: 700; color: var(--color-ink); letter-spacing: 1px; }
-    #error-box { display: none; margin-top: 15px; color: #d32f2f; background: #ffebee; padding: 12px 20px; border-radius: 8px; max-width: 80%; text-align: center; }
-
-    /* UI Layout */
-    .ui-layer { position: absolute; z-index: 10; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; display: grid; grid-template-columns: 360px 1fr 340px; grid-template-rows: auto 1fr auto; padding: 20px; gap: 15px; }
-    .interactive { pointer-events: auto; }
-
-    /* Glass Panels */
-    .glass-card {
-      background: var(--color-bg-glass);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      border-radius: 22px;
-      box-shadow: 0 10px 30px rgba(74, 42, 20, 0.08);
-      overflow: hidden;
-      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-    }
-
-    /* Top Left Header */
-    .brand-card { padding: 18px 24px; }
-    .brand-card h1 { font-size: 1.5rem; font-weight: 900; color: var(--color-primary); display: flex; align-items: center; gap: 8px; }
-    .brand-card .subtitle { font-size: 0.8rem; font-family: var(--font-mono); font-weight: 700; letter-spacing: 2px; color: #8a7a68; margin-top: 2px; }
-
-    /* Left Drawer Info Card */
-    #info-card { grid-column: 1; grid-row: 2 / 4; display: none; flex-direction: column; max-height: calc(100vh - 140px); }
-    #info-card.active { display: flex; }
-    .card-header { padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.06); position: relative; }
-    .card-close { position: absolute; right: 16px; top: 16px; border: none; background: rgba(0,0,0,0.05); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; }
-    .card-close:hover { background: var(--color-primary); color: white; }
-    .card-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
-
-    /* Metric Bricks */
-    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 15px 0; }
-    .metric-brick { background: #fff; padding: 12px 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(0,0,0,0.04); }
-    .metric-val { font-family: Georgia, serif; font-style: italic; font-size: 1.4rem; font-weight: bold; color: var(--color-primary); }
-    .metric-lbl { font-size: 0.75rem; color: #7a6b5d; margin-top: 4px; }
-
-    /* Right Sidebar Tabs & Items */
-    #sidebar { grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column; max-height: calc(100vh - 40px); }
-    .tab-nav { display: flex; padding: 6px; background: rgba(0,0,0,0.04); border-radius: 14px; margin: 16px; }
-    .tab-btn { flex: 1; border: none; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: transparent; transition: 0.2s; }
-    .tab-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .search-box { margin: 0 16px 12px 16px; }
-    .search-box input { width: 100%; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); background: #fff; font-family: var(--font-main); outline: none; }
-    .sidebar-content { overflow-y: auto; flex: 1; padding: 0 16px 16px 16px; }
-
-    details.theme-group { margin-bottom: 8px; border-radius: 12px; background: rgba(255,255,255,0.6); overflow: hidden; }
-    details summary { padding: 12px 16px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
-    details summary::-webkit-details-marker { display: none; }
-    .item-list { padding: 4px 12px 12px 12px; }
-    .item-row { padding: 8px 12px; border-radius: 8px; font-size: 0.88rem; margin-top: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-    .item-row:hover { background: var(--color-yellow); }
-    .badge-num { background: var(--color-primary); color: white; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; }
-
-    /* Bottom HUD Pill Toolbar */
-    #hud-toolbar { grid-column: 2; grid-row: 3; justify-self: center; display: flex; gap: 8px; background: var(--color-bg-glass); padding: 8px 16px; border-radius: 999px; backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-    .hud-btn { border: none; background: transparent; padding: 8px 14px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; font-weight: 700; gap: 2px; min-width: 54px; transition: 0.2s; }
-    .hud-btn:hover { background: var(--color-yellow); }
-    .hud-btn.active { background: var(--color-ink); color: #fff; }
-
-    /* Top Quick Tools */
-    .top-tools { grid-column: 2; grid-row: 1; justify-self: start; display: flex; gap: 8px; }
-    .icon-btn { border: none; background: var(--color-bg-glass); width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .icon-btn:hover { background: var(--color-yellow); }
-
-    /* Live Log Box */
-    #live-log { position: absolute; top: 20px; right: 380px; width: 280px; max-height: 160px; pointer-events: auto; }
-    .log-header { padding: 10px 14px; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(0,0,0,0.05); }
-    .live-dot { width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-    .log-body { padding: 10px 14px; font-size: 0.8rem; overflow-y: auto; max-height: 110px; }
-    .log-item { margin-bottom: 6px; line-height: 1.3; border-left: 2px solid var(--color-primary); padding-left: 6px; }
-
-    /* CSS2D Label Styling */
-    .island-label {
-      background: var(--color-bg-glass); border: 1px solid rgba(255,255,255,0.9); padding: 4px 12px; border-radius: 999px;
-      font-weight: 800; font-size: 0.82rem; color: var(--color-ink); box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-      pointer-events: auto; cursor: pointer; transition: transform 0.2s, background 0.2s; white-space: nowrap;
-    }
-    .island-label:hover { transform: scale(1.1); background: var(--color-yellow); }
-    .island-label.selected { background: var(--color-ink); color: #fff; }
-
-    .item-pin {
-      background: var(--color-primary); color: #fff; border-radius: 50%; width: 22px; height: 22px;
-      display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 0.75rem;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.2); pointer-events: auto; cursor: pointer; border: 2px solid #fff;
-    }
-
-    /* Guide Modal */
-    #guide-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 10000; display: flex; justify-content: center; align-items: center; }
-    .guide-content { background: #fff; padding: 30px; border-radius: 24px; max-width: 480px; width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2); text-align: center; }
-    .guide-step { margin: 16px 0; text-align: left; background: #fdfaf6; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; }
-    .guide-btn { border: none; background: var(--color-primary); color: white; padding: 12px 32px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
-
-    /* Responsive Mobile UI */
-    @media (max-width: 800px) {
-      .ui-layer { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; padding: 10px; }
-      #sidebar { grid-column: 1; grid-row: 3; max-height: 40vh; }
-      #info-card { grid-column: 1; grid-row: 3; max-height: 45vh; }
-      #hud-toolbar { grid-column: 1; grid-row: 4; flex-wrap: wrap; justify-content: center; }
-      #live-log { display: none; }
-    }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: sans-serif; background: #edddcf; }
+    #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+    #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; font-weight: bold; color: #db6a41; background: #fff; padding: 20px 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 999; }
+    .ui-box { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.9); padding: 15px 25px; border-radius: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); z-index: 10; }
   </style>
 </head>
 <body>
-
-  <!-- Loading Screen -->
-  <div id="loading-overlay">
-    <div class="spinner"></div>
-    <div id="loading-text">正在組合政策城市...</div>
-    <div id="error-box"></div>
-  </div>
-
-  <!-- WebGL Container -->
+  <div id="loading">正在載入 3D 政策島...</div>
   <div id="canvas-container"></div>
-
-  <!-- Interactive UI Overlay Layer -->
-  <div class="ui-layer">
-    
-    <!-- Top Left Title Brand Card -->
-    <div class="brand-card glass-card interactive">
-      <h1>🏛️ 示範市 <span style="font-size:0.9rem; font-weight:normal; color:#666;">| 政策島</span></h1>
-      <div class="subtitle">HEART POLICY ISLAND v1.0</div>
-    </div>
-
-    <!-- Top Tools -->
-    <div class="top-tools interactive">
-      <button class="icon-btn" id="btn-reset-cam" title="全景視角">🏠</button>
-      <button class="icon-btn" id="btn-toggle-guide" title="操作說明">?</button>
-    </div>
-
-    <!-- Live Event Log Window -->
-    <div id="live-log" class="glass-card interactive">
-      <div class="log-header"><div class="live-dot"></div><span>城市動態日誌</span></div>
-      <div class="log-body" id="log-list"></div>
-    </div>
-
-    <!-- Left Detail Drawer Card -->
-    <div id="info-card" class="glass-card interactive">
-      <div class="card-header">
-        <button class="card-close" id="btn-close-info">×</button>
-        <h2 id="card-title" style="font-size:1.2rem; font-weight:800;">主題卡片</h2>
-        <div id="card-subtitle" style="font-size:0.8rem; color:#8a7a68; margin-top:2px;">概覽說明</div>
-      </div>
-      <div class="card-body" id="card-content"></div>
-    </div>
-
-    <!-- Right Navigation Sidebar -->
-    <div id="sidebar" class="glass-card interactive">
-      <div class="tab-nav">
-        <button class="tab-btn active" id="tab-themes">政策主題</button>
-        <button class="tab-btn" id="tab-flows">協作網絡</button>
-      </div>
-      <div class="search-box">
-        <input type="text" id="search-input" placeholder="搜尋政策、關鍵字...">
-      </div>
-      <div class="sidebar-content" id="sidebar-list"></div>
-    </div>
-
-    <!-- Bottom HUD Controls -->
-    <div id="hud-toolbar" class="interactive">
-      <button class="hud-btn" id="btn-time-6">🌅<span>06:00</span></button>
-      <button class="hud-btn active" id="btn-time-12">☀️<span>12:00</span></button>
-      <button class="hud-btn" id="btn-time-18">🌆<span>18:00</span></button>
-      <button class="hud-btn" id="btn-time-21">🌙<span>21:00</span></button>
-      <div style="width:1px; background:rgba(0,0,0,0.1); margin:0 4px;"></div>
-      <button class="hud-btn" id="btn-toggle-flows">🔀<span>協作線</span></button>
-      <button class="hud-btn" id="btn-toggle-bird">🦅<span>鳥瞰</span></button>
-    </div>
-
+  <div class="ui-box">
+    <h1 style="margin:0; font-size:1.4rem; color:#db6a41;">🏛️ 示範市政策島</h1>
+    <p style="margin:5px 0 0; font-size:0.9rem; color:#666;">使用滑鼠左鍵拖曳旋轉視角，滾輪縮放。</p>
   </div>
 
-  <!-- Guide / Onboarding Modal -->
-  <div id="guide-modal" style="display:none;">
-    <div class="guide-content">
-      <h2 style="color:var(--color-primary); margin-bottom:10px;">歡迎來到示範市政策島！</h2>
-      <p style="font-size:0.9rem; color:#666;">這是一座由 3D 微縮黏土模型拼成的動態政策城市，展示跨局處政策與市民協作流程。</p>
-      <div class="guide-step"><b>1. 旋轉與探索：</b> 按住滑鼠左鍵拖曳可旋轉視角，滾輪放大縮小。</div>
-      <div class="guide-step"><b>2. 點擊建築：</b> 點擊島上的建築或右側選單，鏡頭會飛近並顯示詳細政策事實。</div>
-      <div class="guide-step"><b>3. 時間與動態：</b> 下方切換日夜時段，觀察動態小人與專案物資在島嶼間的傳輸。</div>
-      <button class="guide-btn" id="btn-close-guide">開始探索城市</button>
-    </div>
-  </div>
+  <!-- Three.js CDN -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 
-  <!-- Main Logic ES Module Application -->
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-    import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
-    // Fast Noise Generator (Fallback to prevent external seed errors)
-    const simplex = {
-      noise2D: (x, y) => Math.sin(x * 1.5) * Math.cos(y * 1.5)
-    };
+    let scene, camera, renderer, controls;
 
-    // ------------------------------------------------------------------
-    // Complete Central DATA
+    init();
+
+    function init() {
+      const container = document.getElementById('canvas-container');
+
+      // Scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xedddcf);
+      scene.fog = new THREE.Fog(0xedddcf, 20, 60);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(12, 14, 18);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+
+      // Controls
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xfff1de, 1.5);
+      dirLight.position.set(15, 25, 15);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      // Create Central Island & City Blocks
+      createIsland();
+
+      // Remove Loading
+      document.getElementById('loading').style.display = 'none';
+
+      // Resize
+      window.addEventListener('resize', onWindowResize);
+
+      // Loop
+      renderer.setAnimationLoop(animate);
+    }
+
+    function createIsland() {
+      // Base Island Hexagon
+      const islandGeo = new THREE.CylinderGeometry(5, 4.5, 0.8, 6);
+      const islandMat = new THREE.MeshStandardMaterial({ color: 0xe8dac8, roughness: 0.8 });
+      const island = new THREE.Mesh(islandGeo, islandMat);
+      island.position.y = -0.4;
+      scene.add(island);
+
+      // Miniature Buildings
+      const colors = [0xdb6a41, 0x58a6a6, 0xf2b5c6, 0x8db86f, 0x3e7c8c];
+      for (let i = 0; i < 7; i++) {
+        const angle = (i / 7) * Math.PI * 2;
+        const r = 2.2;
+        const w = 0.8 + Math.random() * 0.5;
+        const h = 1.0 + Math.random() * 1.5;
+        const d = 0.8 + Math.random() * 0.5;
+
+        const bGeo = new THREE.BoxGeometry(w, h, d);
+        const bMat = new THREE.MeshStandardMaterial({ color: colors[i % colors.length], roughness: 0.7 });
+        const b = new THREE.Mesh(bGeo, bMat);
+        b.position.set(Math.cos(angle) * r, h / 2, Math.sin(angle) * r);
+        b.castShadow = true;
+        scene.add(b);
+      }
+    }
+
+    function animate() {
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  </script>
+</body>
+</html>
