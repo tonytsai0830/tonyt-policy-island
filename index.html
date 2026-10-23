@@ -2,121 +2,413 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>未來市政策島 - 3D 互動政策城市</title>
+  
+  <!-- Importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: sans-serif; background: #edddcf; }
-    #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-    #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; font-weight: bold; color: #db6a41; background: #fff; padding: 20px 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); z-index: 999; }
-    .ui-box { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.9); padding: 15px 25px; border-radius: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); z-index: 10; }
+    :root {
+      --color-primary: #db6a41;
+      --color-ink: #211d1d;
+      --color-cream: #fff8f4;
+      --color-yellow: #fcea8b;
+      --color-bg-glass: rgba(255, 248, 244, 0.88);
+      --font-main: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-main); color: var(--color-ink); background: radial-gradient(circle at center, #fffdf9 0%, #edddcf 100%); }
+
+    #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+    
+    /* Loading Overlay */
+    #loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #edddcf; z-index: 9999; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; transition: opacity 0.6s ease;
+    }
+    .spinner { width: 50px; height: 50px; border: 5px solid rgba(219,106,65,0.2); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-text { margin-top: 20px; font-size: 1.2rem; font-weight: 700; color: var(--color-ink); }
+
+    /* UI Layout */
+    .ui-layer { position: absolute; z-index: 10; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; display: grid; grid-template-columns: 360px 1fr 340px; grid-template-rows: auto 1fr auto; padding: 20px; gap: 15px; }
+    .interactive { pointer-events: auto; }
+
+    /* Glass Panels */
+    .glass-card {
+      background: var(--color-bg-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 22px;
+      box-shadow: 0 10px 30px rgba(74, 42, 20, 0.08);
+      overflow: hidden;
+    }
+
+    /* Top Left Header */
+    .brand-card { padding: 18px 24px; }
+    .brand-card h1 { font-size: 1.5rem; font-weight: 900; color: var(--color-primary); display: flex; align-items: center; gap: 8px; }
+    .brand-card .subtitle { font-size: 0.8rem; font-weight: 700; letter-spacing: 2px; color: #8a7a68; margin-top: 2px; }
+
+    /* Left Drawer Info Card */
+    #info-card { grid-column: 1; grid-row: 2 / 4; display: none; flex-direction: column; max-height: calc(100vh - 140px); }
+    #info-card.active { display: flex; }
+    .card-header { padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.06); position: relative; }
+    .card-close { position: absolute; right: 16px; top: 16px; border: none; background: rgba(0,0,0,0.05); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; }
+    .card-close:hover { background: var(--color-primary); color: white; }
+    .card-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+
+    /* Metric Bricks */
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 15px 0; }
+    .metric-brick { background: #fff; padding: 12px 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(0,0,0,0.04); }
+    .metric-val { font-size: 1.4rem; font-weight: bold; color: var(--color-primary); }
+    .metric-lbl { font-size: 0.75rem; color: #7a6b5d; margin-top: 4px; }
+
+    /* Right Sidebar Tabs & Items */
+    #sidebar { grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column; max-height: calc(100vh - 40px); }
+    .tab-nav { display: flex; padding: 6px; background: rgba(0,0,0,0.04); border-radius: 14px; margin: 16px; }
+    .tab-btn { flex: 1; border: none; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: transparent; transition: 0.2s; }
+    .tab-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .search-box { margin: 0 16px 12px 16px; }
+    .search-box input { width: 100%; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); background: #fff; outline: none; }
+    .sidebar-content { overflow-y: auto; flex: 1; padding: 0 16px 16px 16px; }
+
+    details.theme-group { margin-bottom: 8px; border-radius: 12px; background: rgba(255,255,255,0.6); overflow: hidden; }
+    details summary { padding: 12px 16px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+    .item-list { padding: 4px 12px 12px 12px; }
+    .item-row { padding: 8px 12px; border-radius: 8px; font-size: 0.88rem; margin-top: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .item-row:hover { background: var(--color-yellow); }
+    .badge-num { background: var(--color-primary); color: white; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; }
+
+    /* Bottom HUD Toolbar */
+    #hud-toolbar { grid-column: 2; grid-row: 3; justify-self: center; display: flex; gap: 8px; background: var(--color-bg-glass); padding: 8px 16px; border-radius: 999px; backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+    .hud-btn { border: none; background: transparent; padding: 8px 14px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; font-weight: 700; gap: 2px; min-width: 54px; }
+    .hud-btn:hover { background: var(--color-yellow); }
+    .hud-btn.active { background: var(--color-ink); color: #fff; }
+
+    /* Top Quick Tools */
+    .top-tools { grid-column: 2; grid-row: 1; justify-self: start; display: flex; gap: 8px; }
+    .icon-btn { border: none; background: var(--color-bg-glass); width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+
+    /* CSS2D Labels */
+    .island-label {
+      background: var(--color-bg-glass); border: 1px solid rgba(255,255,255,0.9); padding: 4px 12px; border-radius: 999px;
+      font-weight: 800; font-size: 0.82rem; color: var(--color-ink); box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      pointer-events: auto; cursor: pointer; white-space: nowrap;
+    }
+    .island-label:hover { background: var(--color-yellow); }
+    .island-label.selected { background: var(--color-ink); color: #fff; }
+
+    .item-pin {
+      background: var(--color-primary); color: #fff; border-radius: 50%; width: 22px; height: 22px;
+      display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 0.75rem;
+      cursor: pointer; border: 2px solid #fff;
+    }
   </style>
 </head>
 <body>
-  <div id="loading">正在載入 3D 政策島...</div>
-  <div id="canvas-container"></div>
-  <div class="ui-box">
-    <h1 style="margin:0; font-size:1.4rem; color:#db6a41;">🏛️ 示範市政策島</h1>
-    <p style="margin:5px 0 0; font-size:0.9rem; color:#666;">使用滑鼠左鍵拖曳旋轉視角，滾輪縮放。</p>
+
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">正在組合政策島城市...</div>
   </div>
 
-  <!-- Three.js CDN -->
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-      }
-    }
-  </script>
+  <div id="canvas-container"></div>
+
+  <div class="ui-layer">
+    <div class="brand-card glass-card interactive">
+      <h1>🏛️ 示範市 <span style="font-size:0.9rem; font-weight:normal; color:#666;">| 政策島</span></h1>
+      <div class="subtitle">HEART POLICY ISLAND v1.0</div>
+    </div>
+
+    <div class="top-tools interactive">
+      <button class="icon-btn" id="btn-reset-cam" title="全景視角">🏠</button>
+    </div>
+
+    <div id="info-card" class="glass-card interactive">
+      <div class="card-header">
+        <button class="card-close" id="btn-close-info">×</button>
+        <h2 id="card-title" style="font-size:1.2rem; font-weight:800;">主題卡片</h2>
+        <div id="card-subtitle" style="font-size:0.8rem; color:#8a7a68; margin-top:2px;">概覽說明</div>
+      </div>
+      <div class="card-body" id="card-content"></div>
+    </div>
+
+    <div id="sidebar" class="glass-card interactive">
+      <div class="tab-nav">
+        <button class="tab-btn active">政策主題</button>
+      </div>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="搜尋政策、關鍵字...">
+      </div>
+      <div class="sidebar-content" id="sidebar-list"></div>
+    </div>
+
+    <div id="hud-toolbar" class="interactive">
+      <button class="hud-btn active" id="btn-time-12">☀️<span>日景</span></button>
+      <button class="hud-btn" id="btn-time-21">🌙<span>夜景</span></button>
+    </div>
+  </div>
 
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-    let scene, camera, renderer, controls;
+    const DATA = {
+      islands: [
+        { id: "t01", q: 0, r: 0, name: "交通暢行", icon: "🚌", color: "#db6a41" },
+        { id: "t02", q: 1, r: -1, name: "托育育兒", icon: "👶", color: "#f2b5c6" },
+        { id: "t03", q: 1, r: 0, name: "智慧教育", icon: "📚", color: "#58a6a6" },
+        { id: "t04", q: 0, r: 1, name: "健康長照", icon: "🏥", color: "#6f7fb5" },
+        { id: "t05", q: -1, r: 1, name: "全民運動", icon: "⚽", color: "#71806a" },
+        { id: "t06", q: -1, r: 0, name: "都市綠地", icon: "🌳", color: "#8db86f" },
+        { id: "t07", q: 0, r: -1, name: "文化薈萃", icon: "🎨", color: "#b48560" },
+        { id: "t08", q: 2, r: -1, name: "青年創業", icon: "🚀", color: "#3e7c8c" },
+        { id: "t09", q: 1, r: 1, name: "數位治理", icon: "💻", color: "#58a6a6" },
+        { id: "t10", q: -2, r: 1, name: "韌性安全", icon: "🛡️", color: "#db6a41" },
+        { id: "t11", q: -1, r: 2, name: "環保永續", icon: "♻️", color: "#71806a" },
+        { id: "t12", q: 2, r: -2, name: "觀光休閒", icon: "🧳", color: "#fcea8b" }
+      ],
+      items: [
+        { id: "i01", islandId: "t01", name: "捷運環狀路網擴建", desc: "完成三期環狀捷運工程，大幅縮短跨區通勤時間。", facts: ["每日運量提升 45%", "新增 18 個智慧站點", "減碳年達 12,000 噸"], timeline: "2–3 年" },
+        { id: "i02", islandId: "t01", name: "共享自行車 3.0", desc: "全面換裝智慧電力輔助自行車與無障礙站點。", facts: ["站點密度提升 60%", "累積騎乘破千萬次"], timeline: "第 1 年" },
+        { id: "i03", islandId: "t02", name: "公立托育家園倍增", desc: "活用閒置公有空間設置小型社區化托育中心。", facts: ["增加 1,200 名收托額", "師生比優化至 1:4"], timeline: "2–3 年" },
+        { id: "i04", islandId: "t03", name: "生生有平板學習計畫", desc: "推動互動式數位教材與程式教育全校涵蓋。", facts: ["發放 45,000 台載具", "數位學習時數 +80%"], timeline: "第 1 年" },
+        { id: "i05", islandId: "t04", name: "銀髮日照綜合園區", desc: "結合復健、社交與營養餐飲的一站式長照基地。", facts: ["服務量能 +300%", "照顧者壓力指數 -40%"], timeline: "2–3 年" },
+        { id: "i06", islandId: "t05", name: "全齡多功能運動中心", desc: "配備溫水泳池、體適能中心與室內球場。", facts: ["月均入場 8 萬人次", "銀髮課程免費率 100%"], timeline: "2–3 年" },
+        { id: "i07", islandId: "t06", name: "都市微森林生態公園", desc: "以物種多樣性為核心打造的城市綠洲吸碳島。", facts: ["新增綠地 25 公頃", "降低熱島效應 1.8°C"], timeline: "4 年" },
+        { id: "i08", islandId: "t07", name: "市立美術館二館", desc: "展現現代藝術與當代數位互動裝置展演。", facts: ["年參觀人次預估 150 萬", "國際特展年辦 4 場"], timeline: "4 年" },
+        { id: "i09", islandId: "t08", name: "青創孵化基地", desc: "提供免費辦公空間、法律諮詢與創投媒合。", facts: ["成功輔導 120 家團隊", "籌資總額破 3 億"], timeline: "第 1 年" },
+        { id: "i10", islandId: "t09", name: "市民一碼通 App", desc: "整合圖書館、公共運具與規費繳納之數位身分。", facts: ["下載量突破 80 萬", "臨櫃等候時間 -50%"], timeline: "第 1 年" },
+        { id: "i11", islandId: "t10", name: "智慧防洪滯洪池", desc: "結合物聯網感測之自動化防洪排澇應變系統。", facts: ["容量高達 50 萬立方米", "減少積水風險 90%"], timeline: "2–3 年" },
+        { id: "i12", islandId: "t11", name: "資源循環再造中心", desc: "廚餘轉化有機肥與廚餘發電示範場域。", facts: ["廚餘回收率提升至 75%", "年發電 200 萬度"], timeline: "2–3 年" }
+      ]
+    };
 
-    init();
+    const R = 2.02, SPACING = 2.28, TOP = 0.65;
+    let scene, camera, renderer, cssRenderer, controls;
+    let islandMap = new Map(), itemMeshMap = new Map();
+    let isAnimatingCam = false, camAnimStartTime = 0;
+    let camStartPos = new THREE.Vector3(), camTargetPos = new THREE.Vector3();
+    let camStartLook = new THREE.Vector3(), camTargetLook = new THREE.Vector3();
 
-    function init() {
+    window.addEventListener('DOMContentLoaded', () => {
+      initApp();
+    });
+
+    function initApp() {
       const container = document.getElementById('canvas-container');
-
-      // Scene
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xedddcf);
-      scene.fog = new THREE.Fog(0xedddcf, 20, 60);
-
-      // Camera
-      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(12, 14, 18);
-
-      // Renderer
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       container.appendChild(renderer.domElement);
 
-      // Controls
+      cssRenderer = new CSS2DRenderer();
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.domElement.style.position = 'absolute';
+      cssRenderer.domElement.style.top = '0px';
+      cssRenderer.domElement.style.pointerEvents = 'none';
+      container.appendChild(cssRenderer.domElement);
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0xf4eee3, 30, 100);
+
+      camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.3, 200);
+      camera.position.set(20, 25, 30);
+
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
 
       // Lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      const ambientLight = new THREE.AmbientLight(0xfff1de, 1.2);
       scene.add(ambientLight);
+      const sunLight = new THREE.DirectionalLight(0xfff1de, 2.0);
+      sunLight.position.set(20, 30, 20);
+      sunLight.castShadow = true;
+      scene.add(sunLight);
 
-      const dirLight = new THREE.DirectionalLight(0xfff1de, 1.5);
-      dirLight.position.set(15, 25, 15);
-      dirLight.castShadow = true;
-      scene.add(dirLight);
+      buildIslandsAndBuildings();
+      setupUI();
 
-      // Create Central Island & City Blocks
-      createIsland();
+      setTimeout(() => {
+        document.getElementById('loading-overlay').style.opacity = '0';
+        setTimeout(() => document.getElementById('loading-overlay').style.display = 'none', 500);
+      }, 400);
 
-      // Remove Loading
-      document.getElementById('loading').style.display = 'none';
-
-      // Resize
       window.addEventListener('resize', onWindowResize);
-
-      // Loop
       renderer.setAnimationLoop(animate);
     }
 
-    function createIsland() {
-      // Base Island Hexagon
-      const islandGeo = new THREE.CylinderGeometry(5, 4.5, 0.8, 6);
-      const islandMat = new THREE.MeshStandardMaterial({ color: 0xe8dac8, roughness: 0.8 });
-      const island = new THREE.Mesh(islandGeo, islandMat);
-      island.position.y = -0.4;
-      scene.add(island);
+    function axialToWorld(q, r) {
+      return { x: Math.sqrt(3) * SPACING * (q + r / 2), z: 1.5 * SPACING * r };
+    }
 
-      // Miniature Buildings
-      const colors = [0xdb6a41, 0x58a6a6, 0xf2b5c6, 0x8db86f, 0x3e7c8c];
-      for (let i = 0; i < 7; i++) {
-        const angle = (i / 7) * Math.PI * 2;
-        const r = 2.2;
-        const w = 0.8 + Math.random() * 0.5;
-        const h = 1.0 + Math.random() * 1.5;
-        const d = 0.8 + Math.random() * 0.5;
+    function buildIslandsAndBuildings() {
+      const hexGeo = new THREE.CircleGeometry(R - 0.05, 6);
+      hexGeo.rotateZ(Math.PI / 6);
+      hexGeo.rotateX(-Math.PI / 2);
 
-        const bGeo = new THREE.BoxGeometry(w, h, d);
-        const bMat = new THREE.MeshStandardMaterial({ color: colors[i % colors.length], roughness: 0.7 });
+      DATA.islands.forEach((isData) => {
+        const { x, z } = axialToWorld(isData.q, isData.r);
+        const group = new THREE.Group();
+        group.position.set(x, TOP, z);
+
+        // Island top
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0xe8dac8, roughness: 0.9 });
+        group.add(new THREE.Mesh(hexGeo, groundMat));
+
+        // Island wall
+        const wallGeo = new THREE.CylinderGeometry(R, R * 0.92, TOP + 0.5, 6);
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xe4d6c3, roughness: 0.8 });
+        const wall = new THREE.Mesh(wallGeo, wallMat);
+        wall.position.y = -(TOP + 0.5) / 2;
+        group.add(wall);
+
+        // Label
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'island-label';
+        labelDiv.innerText = `${isData.icon} ${isData.name}`;
+        labelDiv.onclick = () => selectIsland(isData.id);
+        const cssLabel = new CSS2DObject(labelDiv);
+        cssLabel.position.set(0, 0.2, R * 0.75);
+        group.add(cssLabel);
+
+        scene.add(group);
+        islandMap.set(isData.id, { data: isData, worldPos: new THREE.Vector3(x, TOP, z) });
+      });
+
+      // Buildings
+      DATA.items.forEach((item, index) => {
+        const island = islandMap.get(item.islandId);
+        if (!island) return;
+
+        const itemGroup = new THREE.Group();
+        itemGroup.position.set(island.worldPos.x + 0.6, TOP, island.worldPos.z - 0.2);
+
+        const bGeo = new THREE.BoxGeometry(0.7, 0.9, 0.7);
+        const bMat = new THREE.MeshStandardMaterial({ color: 0xdb6a41, roughness: 0.7 });
         const b = new THREE.Mesh(bGeo, bMat);
-        b.position.set(Math.cos(angle) * r, h / 2, Math.sin(angle) * r);
+        b.position.y = 0.45;
         b.castShadow = true;
-        scene.add(b);
+        itemGroup.add(b);
+
+        const pinDiv = document.createElement('div');
+        pinDiv.className = 'item-pin';
+        pinDiv.innerText = `${index + 1}`;
+        pinDiv.onclick = (e) => { e.stopPropagation(); selectItem(item.id); };
+        const cssPin = new CSS2DObject(pinDiv);
+        cssPin.position.set(0, 1.1, 0);
+        itemGroup.add(cssPin);
+
+        scene.add(itemGroup);
+        itemMeshMap.set(item.id, { data: item, group: itemGroup });
+      });
+    }
+
+    function selectIsland(id) {
+      const island = islandMap.get(id);
+      if (!island) return;
+      flyCameraTo(island.worldPos.clone().add(new THREE.Vector3(2, 4, 5)), island.worldPos);
+      const items = DATA.items.filter(it => it.islandId === id);
+      showInfoCard('island', { name: island.data.name, desc: `包含 ${items.length} 項核心政策專案。`, items });
+    }
+
+    function selectItem(id) {
+      const itemObj = itemMeshMap.get(id);
+      if (!itemObj) return;
+      const targetPos = itemObj.group.position.clone();
+      flyCameraTo(targetPos.clone().add(new THREE.Vector3(1.5, 2, 3)), targetPos);
+      showInfoCard('item', itemObj.data);
+    }
+
+    function flyCameraTo(targetCamPos, targetLookAt) {
+      camStartPos.copy(camera.position);
+      camStartLook.copy(controls.target);
+      camTargetPos.copy(targetCamPos);
+      camTargetLook.copy(targetLookAt);
+      isAnimatingCam = true;
+      camAnimStartTime = performance.now();
+    }
+
+    function setupUI() {
+      const sidebarList = document.getElementById('sidebar-list');
+      DATA.islands.forEach(is => {
+        const items = DATA.items.filter(it => it.islandId === is.id);
+        const details = document.createElement('details');
+        details.className = 'theme-group';
+        details.innerHTML = `
+          <summary><span>${is.icon} ${is.name}</span></summary>
+          <div class="item-list">
+            ${items.map(it => `<div class="item-row" onclick="selectItem('${it.id}')"><span>📌 ${it.name}</span></div>`).join('')}
+          </div>
+        `;
+        sidebarList.appendChild(details);
+      });
+
+      document.getElementById('btn-reset-cam').onclick = () => {
+        flyCameraTo(new THREE.Vector3(20, 25, 30), new THREE.Vector3(0, 0, 0));
+        document.getElementById('info-card').classList.remove('active');
+      };
+
+      document.getElementById('btn-close-info').onclick = () => {
+        document.getElementById('info-card').classList.remove('active');
+      };
+
+      document.getElementById('btn-time-12').onclick = () => {
+        scene.background = new THREE.Color(0xf4eee3);
+        renderer.setClearColor(0xf4eee3, 0);
+      };
+      document.getElementById('btn-time-21').onclick = () => {
+        scene.background = new THREE.Color(0x111625);
+      };
+    }
+
+    function showInfoCard(type, data) {
+      const card = document.getElementById('info-card');
+      card.classList.add('active');
+      document.getElementById('card-title').innerText = data.name;
+      document.getElementById('card-subtitle').innerText = data.timeline ? `預計時程：${data.timeline}` : "政策主題概覽";
+      
+      let html = `<p style="font-size:0.9rem; margin-bottom:10px;">${data.desc}</p>`;
+      if (data.facts) {
+        html += `<div class="metric-grid">${data.facts.map(f => `<div class="metric-brick"><div class="metric-val">✨</div><div class="metric-lbl">${f}</div></div>`).join('')}</div>`;
       }
+      if (data.items) {
+        html += data.items.map(it => `<div style="background:#fff; padding:8px; border-radius:8px; margin-top:6px; font-size:0.85rem;"><b>${it.name}</b><br>${it.desc}</div>`).join('');
+      }
+      document.getElementById('card-content').innerHTML = html;
     }
 
     function animate() {
+      if (isAnimatingCam) {
+        const progress = Math.min((performance.now() - camAnimStartTime) / 800, 1);
+        camera.position.lerpVectors(camStartPos, camTargetPos, progress);
+        controls.target.lerpVectors(camStartLook, camTargetLook, progress);
+        if (progress >= 1) isAnimatingCam = false;
+      }
       controls.update();
       renderer.render(scene, camera);
+      cssRenderer.render(scene, camera);
     }
+
+    window.selectItem = selectItem; // Global attach for sidebar
 
     function onWindowResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
     }
   </script>
 </body>
