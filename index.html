@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>未來市政策島 - 3D 互動政策城市</title>
+  <title>FUTURE SOON. 示範市 HEART 政策島</title>
   
-  <!-- Importmap -->
+  <!-- Importmap for Three.js ES Modules -->
   <script type="importmap">
   {
     "imports": {
@@ -17,203 +17,385 @@
 
   <style>
     :root {
-      --color-primary: #db6a41;
-      --color-ink: #211d1d;
-      --color-cream: #fff8f4;
-      --color-yellow: #fcea8b;
-      --color-bg-glass: rgba(255, 248, 244, 0.88);
-      --font-main: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      --primary: #db6a41;
+      --primary-hover: #c4552d;
+      --ink: #211d1d;
+      --bg-cream: #f4eee3;
+      --accent-yellow: #fcea8b;
+      --glass: rgba(255, 248, 244, 0.92);
+      --glass-border: rgba(255, 255, 255, 0.7);
+      --font-main: "PingFang TC", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-main); color: var(--color-ink); background: radial-gradient(circle at center, #fffdf9 0%, #edddcf 100%); }
+    body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-main); color: var(--ink); background: #edddcf; }
 
     #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-    
-    /* Loading Overlay */
-    #loading-overlay {
+
+    /* Loading Screen */
+    #loading-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: #edddcf; z-index: 9999; display: flex; flex-direction: column;
-      justify-content: center; align-items: center; transition: opacity 0.6s ease;
+      justify-content: center; align-items: center; transition: opacity 0.5s ease;
     }
-    .spinner { width: 50px; height: 50px; border: 5px solid rgba(219,106,65,0.2); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
+    .spinner {
+      width: 48px; height: 48px; border: 4px solid rgba(219, 106, 65, 0.2);
+      border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading-text { margin-top: 20px; font-size: 1.2rem; font-weight: 700; color: var(--color-ink); }
+    .loading-text { margin-top: 18px; font-weight: 800; font-size: 1.1rem; color: var(--primary); letter-spacing: 1px; }
 
-    /* UI Layout */
-    .ui-layer { position: absolute; z-index: 10; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; display: grid; grid-template-columns: 360px 1fr 340px; grid-template-rows: auto 1fr auto; padding: 20px; gap: 15px; }
+    /* Main UI Overlay Layout */
+    .ui-layer {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+      pointer-events: none; display: grid;
+      grid-template-columns: 380px 1fr 360px;
+      grid-template-rows: auto 1fr auto;
+      padding: 18px; gap: 14px;
+    }
     .interactive { pointer-events: auto; }
 
-    /* Glass Panels */
-    .glass-card {
-      background: var(--color-bg-glass);
+    /* Glassmorphic Panel Styles */
+    .glass-panel {
+      background: var(--glass);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      border-radius: 22px;
-      box-shadow: 0 10px 30px rgba(74, 42, 20, 0.08);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: 0 12px 32px rgba(60, 40, 20, 0.08);
       overflow: hidden;
     }
 
-    /* Top Left Header */
-    .brand-card { padding: 18px 24px; }
-    .brand-card h1 { font-size: 1.5rem; font-weight: 900; color: var(--color-primary); display: flex; align-items: center; gap: 8px; }
-    .brand-card .subtitle { font-size: 0.8rem; font-weight: 700; letter-spacing: 2px; color: #8a7a68; margin-top: 2px; }
+    /* Top Left Header Branding */
+    .brand-header {
+      padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+      background: rgba(255, 248, 244, 0.95);
+    }
+    .brand-title-box { display: flex; flex-direction: column; }
+    .brand-big { font-size: 1.8rem; font-weight: 900; color: var(--primary); line-height: 1; letter-spacing: -0.5px; }
+    .brand-sub { font-size: 1.1rem; font-weight: 800; color: var(--ink); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+    .heart-badge { background: var(--primary); color: #fff; font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: 900; }
 
-    /* Left Drawer Info Card */
-    #info-card { grid-column: 1; grid-row: 2 / 4; display: none; flex-direction: column; max-height: calc(100vh - 140px); }
-    #info-card.active { display: flex; }
-    .card-header { padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.06); position: relative; }
-    .card-close { position: absolute; right: 16px; top: 16px; border: none; background: rgba(0,0,0,0.05); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; }
-    .card-close:hover { background: var(--color-primary); color: white; }
-    .card-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+    /* Top Center HUD Toolbar */
+    .hud-toolbar-container { grid-column: 2; grid-row: 1; justify-self: center; display: flex; gap: 10px; }
+    
+    .hud-pill-group {
+      display: flex; background: var(--glass); backdrop-filter: blur(12px);
+      padding: 5px; border-radius: 999px; border: 1px solid var(--glass-border);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.06); gap: 4px;
+    }
+    .hud-btn {
+      border: none; background: transparent; padding: 8px 14px; border-radius: 999px;
+      font-size: 0.82rem; font-weight: 800; color: var(--ink); cursor: pointer;
+      display: flex; align-items: center; gap: 6px; transition: all 0.2s;
+    }
+    .hud-btn:hover { background: rgba(0,0,0,0.05); }
+    .hud-btn.active { background: var(--ink); color: #fff; }
 
-    /* Metric Bricks */
-    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin: 15px 0; }
-    .metric-brick { background: #fff; padding: 12px 10px; border-radius: 12px; text-align: center; border: 1px solid rgba(0,0,0,0.04); }
-    .metric-val { font-size: 1.4rem; font-weight: bold; color: var(--color-primary); }
-    .metric-lbl { font-size: 0.75rem; color: #7a6b5d; margin-top: 4px; }
+    /* Top Right Action Tools */
+    .top-actions { grid-column: 2; grid-row: 1; justify-self: end; display: flex; gap: 8px; }
+    .action-btn {
+      border: none; background: var(--glass); border: 1px solid var(--glass-border);
+      padding: 8px 16px; border-radius: 14px; font-size: 0.85rem; font-weight: 800;
+      color: var(--ink); cursor: pointer; display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.05); transition: 0.2s;
+    }
+    .action-btn:hover { background: #fff; transform: translateY(-1px); }
 
-    /* Right Sidebar Tabs & Items */
-    #sidebar { grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column; max-height: calc(100vh - 40px); }
-    .tab-nav { display: flex; padding: 6px; background: rgba(0,0,0,0.04); border-radius: 14px; margin: 16px; }
-    .tab-btn { flex: 1; border: none; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; background: transparent; transition: 0.2s; }
-    .tab-btn.active { background: #fff; color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .search-box { margin: 0 16px 12px 16px; }
-    .search-box input { width: 100%; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); background: #fff; outline: none; }
-    .sidebar-content { overflow-y: auto; flex: 1; padding: 0 16px 16px 16px; }
+    /* Left Policy Detail Drawer */
+    #policy-drawer {
+      grid-column: 1; grid-row: 1 / 4; display: none; flex-direction: column;
+      max-height: calc(100vh - 36px); z-index: 20; animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #policy-drawer.active { display: flex; }
+    @keyframes slideInLeft { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-    details.theme-group { margin-bottom: 8px; border-radius: 12px; background: rgba(255,255,255,0.6); overflow: hidden; }
-    details summary { padding: 12px 16px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
-    .item-list { padding: 4px 12px 12px 12px; }
-    .item-row { padding: 8px 12px; border-radius: 8px; font-size: 0.88rem; margin-top: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-    .item-row:hover { background: var(--color-yellow); }
-    .badge-num { background: var(--color-primary); color: white; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; }
+    .drawer-header { padding: 20px 22px; border-bottom: 1px solid rgba(0,0,0,0.06); position: relative; }
+    .drawer-close {
+      position: absolute; right: 16px; top: 16px; border: none; background: rgba(0,0,0,0.05);
+      width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; font-size: 1.1rem;
+    }
+    .drawer-close:hover { background: var(--primary); color: white; }
 
-    /* Bottom HUD Toolbar */
-    #hud-toolbar { grid-column: 2; grid-row: 3; justify-self: center; display: flex; gap: 8px; background: var(--color-bg-glass); padding: 8px 16px; border-radius: 999px; backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-    .hud-btn { border: none; background: transparent; padding: 8px 14px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; font-weight: 700; gap: 2px; min-width: 54px; }
-    .hud-btn:hover { background: var(--color-yellow); }
-    .hud-btn.active { background: var(--color-ink); color: #fff; }
+    .tag-pill { display: inline-block; background: var(--primary); color: #fff; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; margin-bottom: 8px; }
+    .drawer-title { font-size: 1.4rem; font-weight: 900; color: var(--ink); line-height: 1.2; }
+    .drawer-subtitle { font-size: 0.9rem; color: #665a4e; margin-top: 8px; line-height: 1.5; }
 
-    /* Top Quick Tools */
-    .top-tools { grid-column: 2; grid-row: 1; justify-self: start; display: flex; gap: 8px; }
-    .icon-btn { border: none; background: var(--color-bg-glass); width: 44px; height: 44px; border-radius: 12px; cursor: pointer; font-size: 1.1rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .drawer-body { padding: 20px 22px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 18px; }
+    
+    .quote-box {
+      background: #fff; padding: 14px 16px; border-radius: 14px;
+      border-left: 4px solid var(--primary); font-size: 0.88rem; color: #554a3e; font-style: italic; line-height: 1.5;
+    }
 
-    /* CSS2D Labels */
-    .island-label {
-      background: var(--color-bg-glass); border: 1px solid rgba(255,255,255,0.9); padding: 4px 12px; border-radius: 999px;
-      font-weight: 800; font-size: 0.82rem; color: var(--color-ink); box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    .section-label { font-size: 0.8rem; font-weight: 800; color: #998a7a; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .item-card-list { display: flex; flex-direction: column; gap: 10px; }
+    .item-card {
+      background: #fff; border: 1px solid rgba(0,0,0,0.04); padding: 14px; border-radius: 14px;
+      display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.2s;
+    }
+    .item-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.06); border-color: var(--primary); }
+    .item-card-title { font-weight: 800; font-size: 0.92rem; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+    .item-time-badge { background: #f4efe8; color: #776a5c; font-size: 0.72rem; font-weight: 700; padding: 4px 8px; border-radius: 8px; white-space: nowrap; }
+
+    .collab-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .collab-tag {
+      background: #fff; border: 1px solid rgba(0,0,0,0.08); padding: 6px 12px; border-radius: 10px;
+      font-size: 0.8rem; font-weight: 700; color: #55483c; cursor: pointer; transition: 0.2s;
+    }
+    .collab-tag:hover { background: var(--accent-yellow); border-color: transparent; }
+
+    /* Right Policy Index Sidebar */
+    #sidebar-right {
+      grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column;
+      max-height: calc(100vh - 36px);
+    }
+    .sidebar-header { padding: 20px 22px 14px 22px; }
+    .sidebar-kicker { font-size: 0.75rem; font-weight: 900; color: var(--primary); letter-spacing: 1.5px; }
+    .sidebar-title { font-size: 1.5rem; font-weight: 900; margin-top: 2px; }
+    .sidebar-meta { font-size: 0.8rem; color: #887a6c; margin-top: 4px; font-weight: 600; }
+
+    .search-input-wrap { padding: 0 22px 12px 22px; }
+    .search-input-wrap input {
+      width: 100%; padding: 12px 16px; border-radius: 14px; border: 1px solid rgba(0,0,0,0.1);
+      background: #fff; font-size: 0.88rem; outline: none; font-weight: 600;
+    }
+    .search-input-wrap input:focus { border-color: var(--primary); }
+
+    .sidebar-tabs { display: flex; padding: 4px; background: rgba(0,0,0,0.04); margin: 0 22px 14px 22px; border-radius: 12px; }
+    .tab-btn {
+      flex: 1; border: none; padding: 8px; border-radius: 9px; font-weight: 800;
+      font-size: 0.82rem; cursor: pointer; background: transparent; color: #776a5c; transition: 0.2s;
+    }
+    .tab-btn.active { background: #fff; color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+    .sidebar-scroll { overflow-y: auto; flex: 1; padding: 0 22px 22px 22px; display: flex; flex-direction: column; gap: 10px; }
+    
+    .theme-list-card {
+      background: #fff; border-radius: 14px; padding: 14px; border: 1px solid rgba(0,0,0,0.04);
+      cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px;
+    }
+    .theme-list-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.06); border-color: var(--primary); }
+    .theme-code { font-weight: 900; font-size: 0.85rem; color: var(--primary); }
+    .theme-name { font-weight: 800; font-size: 0.95rem; color: var(--ink); }
+    .theme-tag { font-size: 0.72rem; color: #998a7c; }
+
+    /* CSS2D Island Labels & Item Pins */
+    .css-island-label {
+      background: rgba(255, 252, 248, 0.95);
+      border: 1.5px solid rgba(255, 255, 255, 0.9);
+      padding: 6px 14px; border-radius: 999px;
+      font-weight: 900; font-size: 0.85rem; color: var(--ink);
+      box-shadow: 0 6px 20px rgba(40, 20, 10, 0.15);
+      pointer-events: auto; cursor: pointer; transition: all 0.2s;
+      white-space: nowrap; display: flex; align-items: center; gap: 6px;
+    }
+    .css-island-label:hover { background: var(--accent-yellow); transform: scale(1.05); }
+    .css-island-label.selected { background: var(--ink); color: #fff; }
+    .css-island-num { background: var(--primary); color: #fff; border-radius: 999px; padding: 1px 6px; font-size: 0.72rem; }
+
+    .css-item-pin {
+      background: var(--primary); color: #fff; width: 26px; height: 26px; border-radius: 50%;
+      display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 0.78rem;
+      border: 2.5px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      pointer-events: auto; cursor: pointer; transition: transform 0.2s;
+    }
+    .css-item-pin:hover { transform: scale(1.25); background: var(--ink); }
+
+    .css-item-tag {
+      background: #fff; border: 1px solid rgba(0,0,0,0.1); padding: 4px 10px; border-radius: 999px;
+      font-weight: 800; font-size: 0.75rem; color: var(--ink); box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       pointer-events: auto; cursor: pointer; white-space: nowrap;
     }
-    .island-label:hover { background: var(--color-yellow); }
-    .island-label.selected { background: var(--color-ink); color: #fff; }
+    .css-item-tag:hover { background: var(--accent-yellow); }
 
-    .item-pin {
-      background: var(--color-primary); color: #fff; border-radius: 50%; width: 22px; height: 22px;
-      display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 0.75rem;
-      cursor: pointer; border: 2px solid #fff;
+    /* Responsive adjustments */
+    @media (max-width: 1024px) {
+      .ui-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding: 10px; }
+      #sidebar-right { display: none; }
+      #policy-drawer { position: fixed; bottom: 0; left: 0; width: 100%; max-height: 60vh; border-radius: 24px 24px 0 0; }
+      .hud-toolbar-container { grid-column: 1; grid-row: 3; flex-wrap: wrap; justify-content: center; }
     }
   </style>
 </head>
 <body>
 
-  <div id="loading-overlay">
+  <!-- Loading Screen -->
+  <div id="loading-screen">
     <div class="spinner"></div>
-    <div id="loading-text">正在組合政策島城市...</div>
+    <div class="loading-text">正在組合政策島城市...</div>
   </div>
 
+  <!-- 3D Canvas Container -->
   <div id="canvas-container"></div>
 
+  <!-- UI Overlay Layer -->
   <div class="ui-layer">
-    <div class="brand-card glass-card interactive">
-      <h1>🏛️ 示範市 <span style="font-size:0.9rem; font-weight:normal; color:#666;">| 政策島</span></h1>
-      <div class="subtitle">HEART POLICY ISLAND v1.0</div>
-    </div>
-
-    <div class="top-tools interactive">
-      <button class="icon-btn" id="btn-reset-cam" title="全景視角">🏠</button>
-    </div>
-
-    <div id="info-card" class="glass-card interactive">
-      <div class="card-header">
-        <button class="card-close" id="btn-close-info">×</button>
-        <h2 id="card-title" style="font-size:1.2rem; font-weight:800;">主題卡片</h2>
-        <div id="card-subtitle" style="font-size:0.8rem; color:#8a7a68; margin-top:2px;">概覽說明</div>
+    
+    <!-- Top Left Brand Card -->
+    <div class="glass-panel brand-header interactive">
+      <div class="brand-title-box">
+        <div class="brand-big">FUTURE SOON.</div>
+        <div class="brand-sub">台北順起來 <span class="heart-badge">HEART 政策島</span></div>
       </div>
-      <div class="card-body" id="card-content"></div>
     </div>
 
-    <div id="sidebar" class="glass-card interactive">
-      <div class="tab-nav">
-        <button class="tab-btn active">政策主題</button>
+    <!-- Top Center HUD Toolbar -->
+    <div class="hud-toolbar-container interactive">
+      <!-- Lighting Modes -->
+      <div class="hud-pill-group">
+        <button class="hud-btn" id="btn-dawn">🌅</button>
+        <button class="hud-btn active" id="btn-day">☀️</button>
+        <button class="hud-btn" id="btn-dusk">🌆</button>
+        <button class="hud-btn" id="btn-night">🌙</button>
       </div>
-      <div class="search-box">
+
+      <!-- Feature Toggles -->
+      <div class="hud-pill-group">
+        <button class="hud-btn active" id="toggle-labels">🏷️ 名牌</button>
+        <button class="hud-btn active" id="toggle-walkers">🚌 搬運</button>
+        <button class="hud-btn active" id="toggle-arcs">📈 協作線</button>
+        <button class="hud-btn" id="btn-birds-eye">🦅 鳥瞰</button>
+      </div>
+    </div>
+
+    <!-- Top Right Action Controls -->
+    <div class="top-actions interactive">
+      <button class="action-btn" id="btn-reset-cam">↗ 全景</button>
+      <button class="action-btn" id="btn-toggle-sidebar">≡ 清單</button>
+    </div>
+
+    <!-- Left Interactive Policy Detail Drawer -->
+    <div id="policy-drawer" class="glass-panel interactive">
+      <div class="drawer-header">
+        <button class="drawer-close" id="btn-close-drawer">×</button>
+        <span class="tag-pill" id="drawer-tag">POLICY 03 · 政見</span>
+        <h2 class="drawer-title" id="drawer-title">交通政策</h2>
+        <div class="drawer-subtitle" id="drawer-subtitle">捷運骨幹之外，把走路上學、公車、自行車與共享機車四條綠色道路補起來。</div>
+      </div>
+      <div class="drawer-body" id="drawer-body">
+        <!-- Content dynamically injected via JS -->
+      </div>
+    </div>
+
+    <!-- Right Policy Index Sidebar -->
+    <div id="sidebar-right" class="glass-panel interactive">
+      <div class="sidebar-header">
+        <div class="sidebar-kicker">THE POLICY INDEX</div>
+        <div class="sidebar-title">把改變，連起來。</div>
+        <div class="sidebar-meta">14 項政策主題 / 94 個細項</div>
+      </div>
+
+      <div class="search-input-wrap">
         <input type="text" id="search-input" placeholder="搜尋政策、關鍵字...">
       </div>
-      <div class="sidebar-content" id="sidebar-list"></div>
+
+      <div class="sidebar-tabs">
+        <button class="tab-btn active" id="tab-themes">政策主題</button>
+        <button class="tab-btn" id="tab-collabs">協作關係 20</button>
+      </div>
+
+      <div class="sidebar-scroll" id="sidebar-list">
+        <!-- Sidebar cards dynamically populated -->
+      </div>
     </div>
 
-    <div id="hud-toolbar" class="interactive">
-      <button class="hud-btn active" id="btn-time-12">☀️<span>日景</span></button>
-      <button class="hud-btn" id="btn-time-21">🌙<span>夜景</span></button>
-    </div>
   </div>
 
+  <!-- Application Logic -->
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-    const DATA = {
-      islands: [
-        { id: "t01", q: 0, r: 0, name: "交通暢行", icon: "🚌", color: "#db6a41" },
-        { id: "t02", q: 1, r: -1, name: "托育育兒", icon: "👶", color: "#f2b5c6" },
-        { id: "t03", q: 1, r: 0, name: "智慧教育", icon: "📚", color: "#58a6a6" },
-        { id: "t04", q: 0, r: 1, name: "健康長照", icon: "🏥", color: "#6f7fb5" },
-        { id: "t05", q: -1, r: 1, name: "全民運動", icon: "⚽", color: "#71806a" },
-        { id: "t06", q: -1, r: 0, name: "都市綠地", icon: "🌳", color: "#8db86f" },
-        { id: "t07", q: 0, r: -1, name: "文化薈萃", icon: "🎨", color: "#b48560" },
-        { id: "t08", q: 2, r: -1, name: "青年創業", icon: "🚀", color: "#3e7c8c" },
-        { id: "t09", q: 1, r: 1, name: "數位治理", icon: "💻", color: "#58a6a6" },
-        { id: "t10", q: -2, r: 1, name: "韌性安全", icon: "🛡️", color: "#db6a41" },
-        { id: "t11", q: -1, r: 2, name: "環保永續", icon: "♻️", color: "#71806a" },
-        { id: "t12", q: 2, r: -2, name: "觀光休閒", icon: "🧳", color: "#fcea8b" }
-      ],
-      items: [
-        { id: "i01", islandId: "t01", name: "捷運環狀路網擴建", desc: "完成三期環狀捷運工程，大幅縮短跨區通勤時間。", facts: ["每日運量提升 45%", "新增 18 個智慧站點", "減碳年達 12,000 噸"], timeline: "2–3 年" },
-        { id: "i02", islandId: "t01", name: "共享自行車 3.0", desc: "全面換裝智慧電力輔助自行車與無障礙站點。", facts: ["站點密度提升 60%", "累積騎乘破千萬次"], timeline: "第 1 年" },
-        { id: "i03", islandId: "t02", name: "公立托育家園倍增", desc: "活用閒置公有空間設置小型社區化托育中心。", facts: ["增加 1,200 名收托額", "師生比優化至 1:4"], timeline: "2–3 年" },
-        { id: "i04", islandId: "t03", name: "生生有平板學習計畫", desc: "推動互動式數位教材與程式教育全校涵蓋。", facts: ["發放 45,000 台載具", "數位學習時數 +80%"], timeline: "第 1 年" },
-        { id: "i05", islandId: "t04", name: "銀髮日照綜合園區", desc: "結合復健、社交與營養餐飲的一站式長照基地。", facts: ["服務量能 +300%", "照顧者壓力指數 -40%"], timeline: "2–3 年" },
-        { id: "i06", islandId: "t05", name: "全齡多功能運動中心", desc: "配備溫水泳池、體適能中心與室內球場。", facts: ["月均入場 8 萬人次", "銀髮課程免費率 100%"], timeline: "2–3 年" },
-        { id: "i07", islandId: "t06", name: "都市微森林生態公園", desc: "以物種多樣性為核心打造的城市綠洲吸碳島。", facts: ["新增綠地 25 公頃", "降低熱島效應 1.8°C"], timeline: "4 年" },
-        { id: "i08", islandId: "t07", name: "市立美術館二館", desc: "展現現代藝術與當代數位互動裝置展演。", facts: ["年參觀人次預估 150 萬", "國際特展年辦 4 場"], timeline: "4 年" },
-        { id: "i09", islandId: "t08", name: "青創孵化基地", desc: "提供免費辦公空間、法律諮詢與創投媒合。", facts: ["成功輔導 120 家團隊", "籌資總額破 3 億"], timeline: "第 1 年" },
-        { id: "i10", islandId: "t09", name: "市民一碼通 App", desc: "整合圖書館、公共運具與規費繳納之數位身分。", facts: ["下載量突破 80 萬", "臨櫃等候時間 -50%"], timeline: "第 1 年" },
-        { id: "i11", islandId: "t10", name: "智慧防洪滯洪池", desc: "結合物聯網感測之自動化防洪排澇應變系統。", facts: ["容量高達 50 萬立方米", "減少積水風險 90%"], timeline: "2–3 年" },
-        { id: "i12", islandId: "t11", name: "資源循環再造中心", desc: "廚餘轉化有機肥與廚餘發電示範場域。", facts: ["廚餘回收率提升至 75%", "年發電 200 萬度"], timeline: "2–3 年" }
-      ]
+    // ==========================================
+    // Policy & Island Data Models
+    // ==========================================
+    const ISLAND_DATA = [
+      { id: "t01", q: 0, r: 0, code: "01", name: "市府核心", icon: "🏛️", color: "#db6a41", desc: "數位轉型、開放政府與跨局處創新樞紐。" },
+      { id: "t02", q: 1, r: -1, code: "02", name: "台北研究院", icon: "🔬", color: "#3e7c8c", desc: "城市智庫，以數據驅動都市治理新思維。" },
+      { id: "t03", q: 0, r: 1, code: "03", name: "交通", icon: "🚌", color: "#db6a41", desc: "人本交通，串聯綠色運具與捷運網絡。" },
+      { id: "t04", q: -1, r: 1, code: "04", name: "教育", icon: "🎓", color: "#58a6a6", desc: "雙語數位、適性發展，培育未來市世代。" },
+      { id: "t05", q: 1, r: 0, code: "05", name: "營養午餐", icon: "🍱", color: "#f2b5c6", desc: "有機在地、食育深化，照顧孩子健康。" },
+      { id: "t06", q: 0, r: -1, code: "06", name: "家庭一站通", icon: "🏡", color: "#8db86f", desc: "全齡整合福利服務，育兒安居零障礙。" },
+      { id: "t07", q: -1, r: 0, code: "07", name: "親子同行卡", icon: "💳", color: "#fcea8b", desc: "優惠補貼與場館優惠，陪伴家庭成長。" },
+      { id: "t08", q: -2, r: 1, code: "08", name: "衛福與社會照顧", icon: "🏥", color: "#6f7fb5", desc: "醫療長照結合，健全社區守護網絡。" },
+      { id: "t09", q: -1, r: 2, code: "09", name: "運動", icon: "⚽", color: "#71806a", desc: "全齡體育設施普及，打造健康活力城。" },
+      { id: "t10", q: 1, r: -2, code: "10", name: "文化徑 x 山林徑", icon: "🌲", color: "#b48560", desc: "永續步道與歷史街區，體驗綠色台北。" },
+      { id: "t11", q: 2, r: -1, code: "11", name: "都市微森林", icon: "🌳", color: "#8db86f", desc: "降溫綠化、口袋公園，綠意深入巷弄。" },
+      { id: "t12", q: 2, r: -2, code: "12", name: "青年", icon: "🚀", color: "#3e7c8c", desc: "創業陪伴、租屋補貼，力挺青年安居。" },
+      { id: "t13", q: 1, r: 1, code: "13", name: "城市外交", icon: "🌐", color: "#58a6a6", desc: "首都外交、國際結盟，提升城市能見度。" },
+      { id: "t14", q: -2, r: 2, code: "14", name: "客家", icon: "🏮", color: "#db6a41", desc: "文化傳承、語言推廣，多元族群共榮。" }
+    ];
+
+    const POLICY_ITEMS = [
+      { id: "i01", islandId: "t03", code: "①", name: "通學區安全巷道", desc: "改善校園周邊通學步道，劃設標線型人行道與綠色鋪面。", time: "第 3–4 年", collabs: ["t04 教育", "t08 衛福"] },
+      { id: "i02", islandId: "t03", code: "②", name: "公車安全改革", desc: "升級智慧駕駛輔助系統 (ADAS) 與盲點偵測，保障乘車安全。", time: "第 1–2 年", collabs: ["t01 市府核心"] },
+      { id: "i03", islandId: "t03", code: "③", name: "迎風一港墘自行車橋", desc: "建造跨河自行車專用橋，串聯內湖科學園區與水岸綠廊。", time: "第 1–2 年", collabs: ["t11 都市微森林"] },
+      { id: "i04", islandId: "t03", code: "④", name: "YouBike 2.0E 尖峰免費", desc: "前 30 分鐘免費並增設電輔車站點，鼓勵綠色低碳通勤。", time: "第 1–2 年", collabs: ["t09 運動"] },
+      { id: "i05", islandId: "t03", code: "⑤", name: "TPASS 共享機車", desc: "整合月票制度與共享運具，補足最後一哩路交通需求。", time: "第 1–2 年", collabs: ["t12 青年"] },
+      { id: "i06", islandId: "t01", code: "研", name: "正在搬 藍圖", desc: "智慧治理大數據平台建置。", time: "第 1 年", collabs: ["t02 台北研究院"] },
+      { id: "i07", islandId: "t02", code: "研", name: "台北研究院 智庫", desc: "城市前瞻政策研擬與評估。", time: "第 1 年", collabs: ["t13 城市外交"] },
+      { id: "i08", islandId: "t05", code: "食", name: "有機在地食材庫", desc: "契作優質農場，每日直送營養午餐。", time: "第 1–2 年", collabs: ["t04 教育"] },
+      { id: "i09", islandId: "t11", code: "綠", name: "口袋降溫公園", desc: "鋪設透水鋪面與多層次植栽，降低城市熱島效應。", time: "第 2–3 年", collabs: ["t10 文化徑"] }
+    ];
+
+    // ==========================================
+    // Global Constants & State Variables
+    // ==========================================
+    const HEX_RADIUS = 2.1;
+    const HEX_SPACING = 2.38;
+    const ISLAND_HEIGHT = 0.7;
+
+    let scene, camera, renderer, cssRenderer, controls;
+    let islandMap = new Map();
+    let itemMap = new Map();
+    let walkersList = [];
+    let arcLinesGroup;
+
+    // View Options State
+    const viewOptions = {
+      labels: true,
+      walkers: true,
+      arcs: true,
+      timeOfDay: 'day'
     };
 
-    const R = 2.02, SPACING = 2.28, TOP = 0.65;
-    let scene, camera, renderer, cssRenderer, controls;
-    let islandMap = new Map(), itemMeshMap = new Map();
-    let isAnimatingCam = false, camAnimStartTime = 0;
-    let camStartPos = new THREE.Vector3(), camTargetPos = new THREE.Vector3();
-    let camStartLook = new THREE.Vector3(), camTargetLook = new THREE.Vector3();
+    // Camera Animation Interpolation State
+    let isCamAnimating = false;
+    let camStartTime = 0;
+    const CAM_ANIM_DURATION = 900; // ms
+    const camStartPos = new THREE.Vector3();
+    const camTargetPos = new THREE.Vector3();
+    const camStartLook = new THREE.Vector3();
+    const camTargetLook = new THREE.Vector3();
 
-    window.addEventListener('DOMContentLoaded', () => {
-      initApp();
-    });
+    // Lighting Presets
+    const LIGHT_PRESETS = {
+      dawn:  { bg: 0xf2d6c1, ambient: 0xffe0cd, intensity: 1.1, sunPos: [-15, 12, -15], sunColor: 0xffaa77 },
+      day:   { bg: 0xedddcf, ambient: 0xfff3e6, intensity: 1.5, sunPos: [20, 30, 20],   sunColor: 0xfff1de },
+      dusk:  { bg: 0xda9f83, ambient: 0xffcda8, intensity: 1.2, sunPos: [-20, 10, 10],  sunColor: 0xff7744 },
+      night: { bg: 0x141b2d, ambient: 0x3d4b6e, intensity: 0.6, sunPos: [10, 25, -10],  sunColor: 0x7799bb }
+    };
 
-    function initApp() {
+    // ==========================================
+    // Initialization & Scene Setup
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', init);
+
+    function init() {
       const container = document.getElementById('canvas-container');
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+
+      // WebGL Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       container.appendChild(renderer.domElement);
 
+      // CSS 2D Label Renderer
       cssRenderer = new CSS2DRenderer();
       cssRenderer.setSize(window.innerWidth, window.innerHeight);
       cssRenderer.domElement.style.position = 'absolute';
@@ -221,188 +403,518 @@
       cssRenderer.domElement.style.pointerEvents = 'none';
       container.appendChild(cssRenderer.domElement);
 
+      // Scene
       scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(0xf4eee3, 30, 100);
+      scene.background = new THREE.Color(LIGHT_PRESETS.day.bg);
+      scene.fog = new THREE.FogExp2(LIGHT_PRESETS.day.bg, 0.012);
 
-      camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.3, 200);
-      camera.position.set(20, 25, 30);
+      // Camera
+      camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 300);
+      camera.position.set(22, 28, 34);
 
+      // Orbit Controls
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 - 0.02; // prevent going below ground
+      controls.minDistance = 6;
+      controls.maxDistance = 90;
 
       // Lights
-      const ambientLight = new THREE.AmbientLight(0xfff1de, 1.2);
-      scene.add(ambientLight);
-      const sunLight = new THREE.DirectionalLight(0xfff1de, 2.0);
-      sunLight.position.set(20, 30, 20);
-      sunLight.castShadow = true;
-      scene.add(sunLight);
+      setupLights();
 
-      buildIslandsAndBuildings();
-      setupUI();
+      // Environment & Archipelago Creation
+      createWaterAndMountains();
+      createArchipelago();
+      createBridgeConnections();
+      createCollaborationArcs();
+      createAnimatedWalkers();
 
+      // UI Events Setup
+      bindUIEvents();
+
+      // Remove Loading Screen
       setTimeout(() => {
-        document.getElementById('loading-overlay').style.opacity = '0';
-        setTimeout(() => document.getElementById('loading-overlay').style.display = 'none', 500);
-      }, 400);
+        const loading = document.getElementById('loading-screen');
+        loading.style.opacity = '0';
+        setTimeout(() => loading.style.display = 'none', 500);
+      }, 300);
 
       window.addEventListener('resize', onWindowResize);
       renderer.setAnimationLoop(animate);
     }
 
-    function axialToWorld(q, r) {
-      return { x: Math.sqrt(3) * SPACING * (q + r / 2), z: 1.5 * SPACING * r };
+    // ==========================================
+    // Environment & Procedural Modeling
+    // ==========================================
+    let ambientLight, sunLight;
+
+    function setupLights() {
+      ambientLight = new THREE.AmbientLight(LIGHT_PRESETS.day.ambient, LIGHT_PRESETS.day.intensity);
+      scene.add(ambientLight);
+
+      sunLight = new THREE.DirectionalLight(LIGHT_PRESETS.day.sunColor, 1.8);
+      sunLight.position.set(...LIGHT_PRESETS.day.sunPos);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 0.5;
+      sunLight.shadow.camera.far = 120;
+      const d = 30;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d;
+      scene.add(sunLight);
     }
 
-    function buildIslandsAndBuildings() {
-      const hexGeo = new THREE.CircleGeometry(R - 0.05, 6);
-      hexGeo.rotateZ(Math.PI / 6);
-      hexGeo.rotateX(-Math.PI / 2);
+    function createWaterAndMountains() {
+      // Water Plane
+      const waterGeo = new THREE.PlaneGeometry(300, 300, 32, 32);
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x5bb8c4, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.88
+      });
+      const water = new THREE.Mesh(waterGeo, waterMat);
+      water.rotation.x = -Math.PI / 2;
+      water.position.y = -0.2;
+      scene.add(water);
 
-      DATA.islands.forEach((isData) => {
+      // Background Low-Poly Mountains Ring
+      const mtGroup = new THREE.Group();
+      const mtGeo = new THREE.ConeGeometry(14, 22, 5);
+      const mtMat = new THREE.MeshStandardMaterial({ color: 0x82a67d, roughness: 0.9, flatShading: true });
+
+      for (let i = 0; i < 28; i++) {
+        const angle = (i / 28) * Math.PI * 2;
+        const radius = 65 + Math.random() * 20;
+        const mt = new THREE.Mesh(mtGeo, mtMat);
+        const scale = 0.8 + Math.random() * 0.9;
+        mt.scale.set(scale, scale + Math.random() * 0.5, scale);
+        mt.position.set(Math.cos(angle) * radius, mt.geometry.parameters.height * scale * 0.4 - 2, Math.sin(angle) * radius);
+        mtGroup.add(mt);
+      }
+      scene.add(mtGroup);
+    }
+
+    function axialToWorld(q, r) {
+      const x = Math.sqrt(3) * HEX_SPACING * (q + r / 2);
+      const z = 1.5 * HEX_SPACING * r;
+      return { x, z };
+    }
+
+    function createArchipelago() {
+      const hexGeo = new THREE.CylinderGeometry(HEX_RADIUS, HEX_RADIUS * 0.94, ISLAND_HEIGHT, 6);
+
+      ISLAND_DATA.forEach((isData) => {
         const { x, z } = axialToWorld(isData.q, isData.r);
-        const group = new THREE.Group();
-        group.position.set(x, TOP, z);
+        const islandGroup = new THREE.Group();
+        islandGroup.position.set(x, ISLAND_HEIGHT / 2, z);
 
-        // Island top
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0xe8dac8, roughness: 0.9 });
-        group.add(new THREE.Mesh(hexGeo, groundMat));
+        // Main Base Top Surface
+        const topMat = new THREE.MeshStandardMaterial({ color: 0xe3d4c1, roughness: 0.8 });
+        const topMesh = new THREE.Mesh(hexGeo, topMat);
+        topMesh.receiveShadow = true;
+        topMesh.castShadow = true;
+        islandGroup.add(topMesh);
 
-        // Island wall
-        const wallGeo = new THREE.CylinderGeometry(R, R * 0.92, TOP + 0.5, 6);
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0xe4d6c3, roughness: 0.8 });
-        const wall = new THREE.Mesh(wallGeo, wallMat);
-        wall.position.y = -(TOP + 0.5) / 2;
-        group.add(wall);
+        // Yellow/Black Striped Hazard Border Trim
+        const borderGeo = new THREE.CylinderGeometry(HEX_RADIUS * 1.02, HEX_RADIUS * 1.02, 0.15, 6);
+        const borderMat = new THREE.MeshStandardMaterial({ color: 0xe6a838, roughness: 0.5 });
+        const borderMesh = new THREE.Mesh(borderGeo, borderMat);
+        borderMesh.position.y = -ISLAND_HEIGHT / 2 + 0.1;
+        islandGroup.add(borderMesh);
 
-        // Label
+        // Decorate Island Surface with Buildings & Micro Details
+        decorateIslandSurface(islandGroup, isData);
+
+        // Add CSS2D Label Tag
         const labelDiv = document.createElement('div');
-        labelDiv.className = 'island-label';
-        labelDiv.innerText = `${isData.icon} ${isData.name}`;
-        labelDiv.onclick = () => selectIsland(isData.id);
-        const cssLabel = new CSS2DObject(labelDiv);
-        cssLabel.position.set(0, 0.2, R * 0.75);
-        group.add(cssLabel);
+        labelDiv.className = 'css-island-label';
+        labelDiv.id = `label-${isData.id}`;
+        labelDiv.innerHTML = `<span class="css-island-num">${isData.code}</span> <span>${isData.name}</span>`;
+        labelDiv.onclick = (e) => { e.stopPropagation(); selectIsland(isData.id); };
 
-        scene.add(group);
-        islandMap.set(isData.id, { data: isData, worldPos: new THREE.Vector3(x, TOP, z) });
+        const cssObj = new CSS2DObject(labelDiv);
+        cssObj.position.set(0, 1.2, HEX_RADIUS * 0.7);
+        islandGroup.add(cssObj);
+
+        scene.add(islandGroup);
+        islandMap.set(isData.id, { data: isData, group: islandGroup, worldPos: new THREE.Vector3(x, ISLAND_HEIGHT, z) });
       });
 
-      // Buildings
-      DATA.items.forEach((item, index) => {
+      // Spawn Specific Policy Structures
+      POLICY_ITEMS.forEach((item) => {
         const island = islandMap.get(item.islandId);
         if (!island) return;
 
         const itemGroup = new THREE.Group();
-        itemGroup.position.set(island.worldPos.x + 0.6, TOP, island.worldPos.z - 0.2);
+        // Slightly offset inside the island
+        const offsetX = (Math.random() - 0.5) * 1.2;
+        const offsetZ = (Math.random() - 0.5) * 1.2;
+        itemGroup.position.set(island.worldPos.x + offsetX, ISLAND_HEIGHT, island.worldPos.z + offsetZ);
 
-        const bGeo = new THREE.BoxGeometry(0.7, 0.9, 0.7);
-        const bMat = new THREE.MeshStandardMaterial({ color: 0xdb6a41, roughness: 0.7 });
-        const b = new THREE.Mesh(bGeo, bMat);
-        b.position.y = 0.45;
-        b.castShadow = true;
-        itemGroup.add(b);
+        // Policy Feature Mini Structure
+        const bGeo = new THREE.BoxGeometry(0.65, 0.85, 0.65);
+        const bMat = new THREE.MeshStandardMaterial({ color: 0xdb6a41, roughness: 0.6 });
+        const bMesh = new THREE.Mesh(bGeo, bMat);
+        bMesh.position.y = 0.425;
+        bMesh.castShadow = true;
+        itemGroup.add(bMesh);
 
+        // CSS2D Pin
         const pinDiv = document.createElement('div');
-        pinDiv.className = 'item-pin';
-        pinDiv.innerText = `${index + 1}`;
-        pinDiv.onclick = (e) => { e.stopPropagation(); selectItem(item.id); };
-        const cssPin = new CSS2DObject(pinDiv);
-        cssPin.position.set(0, 1.1, 0);
-        itemGroup.add(cssPin);
+        pinDiv.className = 'css-item-pin';
+        pinDiv.innerText = item.code;
+        pinDiv.onclick = (e) => { e.stopPropagation(); selectPolicyItem(item.id); };
+
+        const pinObj = new CSS2DObject(pinDiv);
+        pinObj.position.set(0, 1.2, 0);
+        itemGroup.add(pinObj);
 
         scene.add(itemGroup);
-        itemMeshMap.set(item.id, { data: item, group: itemGroup });
+        itemMap.set(item.id, { data: item, group: itemGroup, worldPos: itemGroup.position });
       });
     }
 
+    function decorateIslandSurface(group, isData) {
+      // Random Trees, Windmills, or Mini Blocks
+      const numTrees = Math.floor(Math.random() * 3) + 1;
+      const treeGeo = new THREE.ConeGeometry(0.35, 0.8, 5);
+      const treeMat = new THREE.MeshStandardMaterial({ color: 0x6e9365, roughness: 0.9, flatShading: true });
+
+      for (let i = 0; i < numTrees; i++) {
+        const tree = new THREE.Mesh(treeGeo, treeMat);
+        tree.position.set((Math.random() - 0.5) * 2.2, 0.75, (Math.random() - 0.5) * 2.2);
+        tree.castShadow = true;
+        group.add(tree);
+      }
+
+      // Add Mini Buildings
+      const bldgGeo = new THREE.BoxGeometry(0.5, 0.7 + Math.random() * 0.6, 0.5);
+      const bldgMat = new THREE.MeshStandardMaterial({ color: isData.color, roughness: 0.7 });
+      const bldg = new THREE.Mesh(bldgGeo, bldgMat);
+      bldg.position.set((Math.random() - 0.5) * 1.5, 0.7, (Math.random() - 0.5) * 1.5);
+      bldg.castShadow = true;
+      group.add(bldg);
+    }
+
+    function createBridgeConnections() {
+      const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xa88f78, roughness: 0.8 });
+
+      // Connect neighbor islands with wooden plank bridges
+      const visited = new Set();
+      ISLAND_DATA.forEach(a => {
+        ISLAND_DATA.forEach(b => {
+          if (a.id === b.id) return;
+          const key = [a.id, b.id].sort().join('-');
+          if (visited.has(key)) return;
+
+          const dist = Math.hypot(a.q - b.q, a.r - b.r);
+          if (dist <= 1.5) {
+            visited.add(key);
+            const posA = islandMap.get(a.id).worldPos;
+            const posB = islandMap.get(b.id).worldPos;
+
+            const midX = (posA.x + posB.x) / 2;
+            const midZ = (posA.z + posB.z) / 2;
+            const bridgeLen = posA.distanceTo(posB) - HEX_RADIUS * 1.5;
+
+            const bridgeGeo = new THREE.BoxGeometry(0.4, 0.1, bridgeLen);
+            const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+            bridge.position.set(midX, ISLAND_HEIGHT - 0.05, midZ);
+            bridge.lookAt(posB.x, ISLAND_HEIGHT - 0.05, posB.z);
+            scene.add(bridge);
+          }
+        });
+      });
+    }
+
+    function createCollaborationArcs() {
+      arcLinesGroup = new THREE.Group();
+
+      POLICY_ITEMS.forEach(item => {
+        const sourceIsland = islandMap.get(item.islandId);
+        if (!sourceIsland) return;
+
+        item.collabs.forEach(collabStr => {
+          const targetCode = collabStr.split(' ')[0];
+          const targetIsland = Array.from(islandMap.values()).find(is => is.data.id === targetCode || is.data.name === collabStr.split(' ')[1]);
+          if (!targetIsland) return;
+
+          const start = sourceIsland.worldPos;
+          const end = targetIsland.worldPos;
+
+          // Quadratic Bezier Curve elevated in 3D
+          const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+          mid.y += 3.5 + Math.random() * 1.5;
+
+          const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+          const points = curve.getPoints(24);
+          const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+          const lineMat = new THREE.LineBasicMaterial({ color: 0xdb6a41, transparent: true, opacity: 0.55, linewidth: 2 });
+          const arcLine = new THREE.Line(lineGeo, lineMat);
+
+          arcLinesGroup.add(arcLine);
+        });
+      });
+
+      scene.add(arcLinesGroup);
+    }
+
+    function createAnimatedWalkers() {
+      // Mini Chibi / Delivery Bus Vehicles travelling between islands
+      const carGeo = new THREE.BoxGeometry(0.3, 0.2, 0.4);
+      const carMat = new THREE.MeshStandardMaterial({ color: 0xdb6a41 });
+
+      for (let i = 0; i < 6; i++) {
+        const car = new THREE.Mesh(carGeo, carMat);
+        car.castShadow = true;
+        scene.add(car);
+
+        const route = [
+          islandMap.get("t01").worldPos,
+          islandMap.get("t03").worldPos,
+          islandMap.get("t04").worldPos,
+          islandMap.get("t06").worldPos
+        ];
+
+        walkersList.push({
+          mesh: car,
+          route,
+          currentIdx: Math.floor(Math.random() * route.length),
+          progress: Math.random()
+        });
+      }
+    }
+
+    // ==========================================
+    // Interactions, Selection & Camera Logic
+    // ==========================================
     function selectIsland(id) {
       const island = islandMap.get(id);
       if (!island) return;
-      flyCameraTo(island.worldPos.clone().add(new THREE.Vector3(2, 4, 5)), island.worldPos);
-      const items = DATA.items.filter(it => it.islandId === id);
-      showInfoCard('island', { name: island.data.name, desc: `包含 ${items.length} 項核心政策專案。`, items });
+
+      // Update Label styling
+      document.querySelectorAll('.css-island-label').forEach(el => el.classList.remove('selected'));
+      const activeLabel = document.getElementById(`label-${id}`);
+      if (activeLabel) activeLabel.classList.add('selected');
+
+      // Camera Fly To Focus
+      const targetPos = island.worldPos.clone().add(new THREE.Vector3(3.5, 6.5, 8.5));
+      flyCameraTo(targetPos, island.worldPos);
+
+      // Open Policy Drawer
+      const items = POLICY_ITEMS.filter(it => it.islandId === id);
+      openDrawer({
+        tag: `THEME ${island.data.code} · 政策主題`,
+        title: `${island.data.icon} ${island.data.name}`,
+        subtitle: island.data.desc,
+        items: items
+      });
     }
 
-    function selectItem(id) {
-      const itemObj = itemMeshMap.get(id);
+    function selectPolicyItem(itemId) {
+      const itemObj = itemMap.get(itemId);
       if (!itemObj) return;
-      const targetPos = itemObj.group.position.clone();
-      flyCameraTo(targetPos.clone().add(new THREE.Vector3(1.5, 2, 3)), targetPos);
-      showInfoCard('item', itemObj.data);
+
+      const targetLook = itemObj.worldPos;
+      const targetCam = targetLook.clone().add(new THREE.Vector3(2.5, 4.5, 6));
+      flyCameraTo(targetCam, targetLook);
+
+      openDrawer({
+        tag: `POLICY ITEM · 政策細項`,
+        title: `${itemObj.data.code} ${itemObj.data.name}`,
+        subtitle: itemObj.data.desc,
+        time: itemObj.data.time,
+        collabs: itemObj.data.collabs
+      });
     }
 
-    function flyCameraTo(targetCamPos, targetLookAt) {
+    function flyCameraTo(targetCam, targetLook) {
       camStartPos.copy(camera.position);
       camStartLook.copy(controls.target);
-      camTargetPos.copy(targetCamPos);
-      camTargetLook.copy(targetLookAt);
-      isAnimatingCam = true;
-      camAnimStartTime = performance.now();
+      camTargetPos.copy(targetCam);
+      camTargetLook.copy(targetLook);
+
+      isCamAnimating = true;
+      camStartTime = performance.now();
     }
 
-    function setupUI() {
-      const sidebarList = document.getElementById('sidebar-list');
-      DATA.islands.forEach(is => {
-        const items = DATA.items.filter(it => it.islandId === is.id);
-        const details = document.createElement('details');
-        details.className = 'theme-group';
-        details.innerHTML = `
-          <summary><span>${is.icon} ${is.name}</span></summary>
-          <div class="item-list">
-            ${items.map(it => `<div class="item-row" onclick="selectItem('${it.id}')"><span>📌 ${it.name}</span></div>`).join('')}
+    function openDrawer(data) {
+      const drawer = document.getElementById('policy-drawer');
+      drawer.classList.add('active');
+
+      document.getElementById('drawer-tag').innerText = data.tag || 'POLICY';
+      document.getElementById('drawer-title').innerText = data.title;
+      document.getElementById('drawer-subtitle').innerText = data.subtitle;
+
+      const body = document.getElementById('drawer-body');
+      let html = '';
+
+      if (data.items && data.items.length > 0) {
+        html += `<div class="section-label">包含項目 (${data.items.length})</div>`;
+        html += `<div class="item-card-list">`;
+        data.items.forEach(it => {
+          html += `
+            <div class="item-card" onclick="window.appSelectPolicyItem('${it.id}')">
+              <div class="item-card-title"><span>📌</span> <span>${it.name}</span></div>
+              <div class="item-time-badge">${it.time}</div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+      } else if (data.collabs) {
+        html += `
+          <div class="quote-box">「預計於 ${data.time || '1–2 年'} 內推動落地，打造城市新風貌。」</div>
+          <div class="section-label">和誰一起做</div>
+          <div class="collab-tags">
+            ${data.collabs.map(c => `<div class="collab-tag">🤝 ${c}</div>`).join('')}
           </div>
         `;
-        sidebarList.appendChild(details);
+      }
+
+      body.innerHTML = html;
+    }
+
+    // ==========================================
+    // UI Event Handlers & Binding
+    // ==========================================
+    function bindUIEvents() {
+      // Sidebar Rendering
+      renderSidebarList();
+
+      // Drawer Close
+      document.getElementById('btn-close-drawer').onclick = () => {
+        document.getElementById('policy-drawer').classList.remove('active');
+      };
+
+      // Camera Reset
+      document.getElementById('btn-reset-cam').onclick = () => {
+        flyCameraTo(new THREE.Vector3(22, 28, 34), new THREE.Vector3(0, 0, 0));
+        document.getElementById('policy-drawer').classList.remove('active');
+        document.querySelectorAll('.css-island-label').forEach(el => el.classList.remove('selected'));
+      };
+
+      // Birds Eye View
+      document.getElementById('btn-birds-eye').onclick = () => {
+        flyCameraTo(new THREE.Vector3(0, 42, 0.1), new THREE.Vector3(0, 0, 0));
+      };
+
+      // Lighting Presets Switches
+      ['dawn', 'day', 'dusk', 'night'].forEach(mode => {
+        document.getElementById(`btn-${mode}`).onclick = (e) => {
+          document.querySelectorAll('.hud-pill-group .hud-btn').forEach(btn => {
+            if (['btn-dawn', 'btn-day', 'btn-dusk', 'btn-night'].includes(btn.id)) btn.classList.remove('active');
+          });
+          e.currentTarget.classList.add('active');
+          setLightingMode(mode);
+        };
       });
 
-      document.getElementById('btn-reset-cam').onclick = () => {
-        flyCameraTo(new THREE.Vector3(20, 25, 30), new THREE.Vector3(0, 0, 0));
-        document.getElementById('info-card').classList.remove('active');
+      // Toggles
+      document.getElementById('toggle-labels').onclick = (e) => {
+        viewOptions.labels = !viewOptions.labels;
+        e.currentTarget.classList.toggle('active', viewOptions.labels);
+        document.querySelectorAll('.css-island-label').forEach(el => el.style.display = viewOptions.labels ? 'flex' : 'none');
       };
 
-      document.getElementById('btn-close-info').onclick = () => {
-        document.getElementById('info-card').classList.remove('active');
+      document.getElementById('toggle-arcs').onclick = (e) => {
+        viewOptions.arcs = !viewOptions.arcs;
+        e.currentTarget.classList.toggle('active', viewOptions.arcs);
+        arcLinesGroup.visible = viewOptions.arcs;
       };
 
-      document.getElementById('btn-time-12').onclick = () => {
-        scene.background = new THREE.Color(0xf4eee3);
-        renderer.setClearColor(0xf4eee3, 0);
+      document.getElementById('toggle-walkers').onclick = (e) => {
+        viewOptions.walkers = !viewOptions.walkers;
+        e.currentTarget.classList.toggle('active', viewOptions.walkers);
+        walkersList.forEach(w => w.mesh.visible = viewOptions.walkers);
       };
-      document.getElementById('btn-time-21').onclick = () => {
-        scene.background = new THREE.Color(0x111625);
+
+      // Sidebar Toggle
+      document.getElementById('btn-toggle-sidebar').onclick = () => {
+        const sb = document.getElementById('sidebar-right');
+        sb.style.display = (sb.style.display === 'none') ? 'flex' : 'none';
       };
+
+      // Search Input Filter
+      document.getElementById('search-input').oninput = (e) => {
+        const val = e.target.value.toLowerCase();
+        renderSidebarList(val);
+      };
+
+      // Window Global Helper for Drawer Clicking
+      window.appSelectPolicyItem = selectPolicyItem;
     }
 
-    function showInfoCard(type, data) {
-      const card = document.getElementById('info-card');
-      card.classList.add('active');
-      document.getElementById('card-title').innerText = data.name;
-      document.getElementById('card-subtitle').innerText = data.timeline ? `預計時程：${data.timeline}` : "政策主題概覽";
-      
-      let html = `<p style="font-size:0.9rem; margin-bottom:10px;">${data.desc}</p>`;
-      if (data.facts) {
-        html += `<div class="metric-grid">${data.facts.map(f => `<div class="metric-brick"><div class="metric-val">✨</div><div class="metric-lbl">${f}</div></div>`).join('')}</div>`;
-      }
-      if (data.items) {
-        html += data.items.map(it => `<div style="background:#fff; padding:8px; border-radius:8px; margin-top:6px; font-size:0.85rem;"><b>${it.name}</b><br>${it.desc}</div>`).join('');
-      }
-      document.getElementById('card-content').innerHTML = html;
+    function setLightingMode(mode) {
+      const preset = LIGHT_PRESETS[mode];
+      if (!preset) return;
+
+      scene.background.setHex(preset.bg);
+      scene.fog.color.setHex(preset.bg);
+      ambientLight.color.setHex(preset.ambient);
+      ambientLight.intensity = preset.intensity;
+      sunLight.color.setHex(preset.sunColor);
+      sunLight.position.set(...preset.sunPos);
     }
 
-    function animate() {
-      if (isAnimatingCam) {
-        const progress = Math.min((performance.now() - camAnimStartTime) / 800, 1);
-        camera.position.lerpVectors(camStartPos, camTargetPos, progress);
-        controls.target.lerpVectors(camStartLook, camTargetLook, progress);
-        if (progress >= 1) isAnimatingCam = false;
+    function renderSidebarList(filter = '') {
+      const container = document.getElementById('sidebar-list');
+      let html = '';
+
+      ISLAND_DATA.filter(is => is.name.toLowerCase().includes(filter) || is.desc.toLowerCase().includes(filter)).forEach(is => {
+        const count = POLICY_ITEMS.filter(it => it.islandId === is.id).length;
+        html += `
+          <div class="theme-list-card" onclick="window.appSelectIsland('${is.id}')">
+            <div class="theme-code">F${is.code} · ${is.icon}</div>
+            <div class="theme-name">${is.name}</div>
+            <div class="theme-tag">${count > 0 ? `${count} 項重點政策` : '政策研擬中'}</div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      window.appSelectIsland = selectIsland;
+    }
+
+    // ==========================================
+    // Render Loop & Animation Updates
+    // ==========================================
+    function animate(time) {
+      // 1. Smooth Camera Interpolation (Lerp)
+      if (isCamAnimating) {
+        const elapsed = performance.now() - camStartTime;
+        const progress = Math.min(elapsed / CAM_ANIM_DURATION, 1);
+        // Ease Out Cubic
+        const ease = 1 - Math.pow(1 - progress, 3);
+
+        camera.position.lerpVectors(camStartPos, camTargetPos, ease);
+        controls.target.lerpVectors(camStartLook, camTargetLook, ease);
+
+        if (progress >= 1) isCamAnimating = false;
       }
+
+      // 2. Animate Walkers / Delivery Vehicles
+      if (viewOptions.walkers) {
+        walkersList.forEach(w => {
+          w.progress += 0.004;
+          if (w.progress >= 1) {
+            w.progress = 0;
+            w.currentIdx = (w.currentIdx + 1) % w.route.length;
+          }
+          const p1 = w.route[w.currentIdx];
+          const p2 = w.route[(w.currentIdx + 1) % w.route.length];
+
+          w.mesh.position.lerpVectors(p1, p2, w.progress);
+          w.mesh.position.y = ISLAND_HEIGHT + 0.1;
+          w.mesh.lookAt(p2.x, ISLAND_HEIGHT + 0.1, p2.z);
+        });
+      }
+
       controls.update();
       renderer.render(scene, camera);
       cssRenderer.render(scene, camera);
     }
-
-    window.selectItem = selectItem; // Global attach for sidebar
 
     function onWindowResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
